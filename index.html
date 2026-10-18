@@ -11,6 +11,7 @@
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content="numération" />
     <meta property="og:locale" content="fr_FR" />
+    <meta property="og:url" content="https://yanbxr.github.io/numeration/" />
     <meta property="og:title" content="correcteur de numération" />
     <meta
       property="og:description"
@@ -99,7 +100,7 @@
       }
 
       .wrap {
-        max-width: 1320px;
+        max-width: 1360px;
         margin: 0 auto;
         padding-left: max(16px, env(safe-area-inset-left, 0px));
         padding-right: max(16px, env(safe-area-inset-right, 0px));
@@ -549,6 +550,26 @@
         overflow-x: auto;
         max-width: 100%;
       }
+      .out,
+      .viz,
+      .viz-body,
+      .stack,
+      .enonce {
+        grid-template-columns: minmax(0, 1fr);
+      }
+      .viz-body > *,
+      .stack > * {
+        min-width: 0;
+      }
+      .steps li span,
+      .tail,
+      .note,
+      .readout,
+      .fblock .val,
+      .norm,
+      mark {
+        overflow-wrap: anywhere;
+      }
       .steps ol {
         list-style: none;
         margin: 0;
@@ -782,6 +803,39 @@
         font-weight: 700;
       }
 
+      .bytes {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .byte {
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        padding: 6px 8px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        background: var(--panel);
+        min-width: 96px;
+      }
+      .byte .bb {
+        font-size: 13px;
+        color: var(--dim);
+      }
+      .byte .bv {
+        font-size: 12px;
+        color: var(--dim);
+      }
+      .byte b {
+        font-size: 18px;
+        min-height: 1.4em;
+      }
+      .byte.ext {
+        border-color: var(--accent);
+      }
+      .byte.ext b {
+        color: var(--accent);
+      }
       .wcols {
         display: flex;
         flex-wrap: wrap;
@@ -1238,18 +1292,15 @@
             stored: ip + ',' + fracToDec(fracBin),
           };
         }
-        function fixedDecode(str, iBits) {
-          let s = clean(str).replace('.', ',');
-          let ib, fb;
-          if (s.includes(',')) {
-            [ib, fb] = s.split(',');
-          } else {
-            if (s.length < iBits) s = s.padStart(iBits, '0');
-            ib = s.slice(0, iBits);
-            fb = s.slice(iBits);
-          }
+        function fixedDecode(str) {
+          const s = clean(str).replace('.', ',');
+          if (!s.includes(','))
+            return fail(
+              'placez la virgule entre la partie entière et la partie décimale, par exemple 0110,1010.',
+            );
+          let [ib, fb] = s.split(',');
           if (!/^[01]*$/.test(ib) || !/^[01]*$/.test(fb) || !(ib + fb))
-            return fail('saisissez une suite de 0 et de 1 (avec ou sans virgule).');
+            return fail('saisissez une suite de 0 et de 1 avec une virgule, par exemple 0110,1010.');
           ib = ib || '0';
           const intTerms = [...ib].map((c, i) => ({ c, pos: ib.length - 1 - i })).filter((t) => t.c === '1');
           const fracTerms = [...fb]
@@ -1491,6 +1542,101 @@
           return { n, umax: (1n << N) - 1n, smin: -(1n << (N - 1n)), smax: (1n << (N - 1n)) - 1n };
         }
 
+        function decimalError(original, stored) {
+          const a = parseDec(original),
+            b = parseDec(stored);
+          const scale = Math.max(a.frac.length, b.frac.length);
+          const toBig = (p) => (p.neg ? -1n : 1n) * BigInt(p.int + p.frac.padEnd(scale, '0'));
+          let d = toBig(b) - toBig(a);
+          if (d < 0n) d = -d;
+          const digits = d.toString().padStart(scale + 1, '0');
+          const abs = scale
+            ? `${digits.slice(0, -scale)},${digits.slice(-scale)}`.replace(/,?0+$/, '')
+            : digits;
+          const x = Math.abs(parseFloat(`${a.int}.${a.frac || '0'}`));
+          return { abs, rel: x ? Number(d) / 10 ** scale / x : 0 };
+        }
+        function ieeeError(original, hex) {
+          const d = ieeeDecode(hex, 'hex');
+          if (d.err || d.kind !== 'normal' || d.exact === undefined) return null;
+          return { stored: d.exact, ...decimalError(original, d.exact) };
+        }
+
+        const CTRL = [
+          'NUL',
+          'SOH',
+          'STX',
+          'ETX',
+          'EOT',
+          'ENQ',
+          'ACK',
+          'BEL',
+          'BS',
+          'HT',
+          'LF',
+          'VT',
+          'FF',
+          'CR',
+          'SO',
+          'SI',
+          'DLE',
+          'DC1',
+          'DC2',
+          'DC3',
+          'DC4',
+          'NAK',
+          'SYN',
+          'ETB',
+          'CAN',
+          'EM',
+          'SUB',
+          'ESC',
+          'FS',
+          'GS',
+          'RS',
+          'US',
+        ];
+        const printable = (v) => v > 32 && v !== 127 && !(v >= 128 && v < 160);
+        const charLabel = (v) =>
+          v < 32
+            ? CTRL[v]
+            : v === 32
+              ? 'espace'
+              : v === 127
+                ? 'DEL'
+                : printable(v)
+                  ? String.fromCharCode(v)
+                  : 'contrôle';
+        const byteOf = (val) => {
+          const bits = val.toString(2).padStart(8, '0');
+          return { bits, val, hex: bitsToHex(bits), label: charLabel(val), ascii: val < 128 };
+        };
+        function bitsToText(str) {
+          const s = clean(str).replace(/^0b/i, '');
+          if (!/^[01]+$/.test(s)) return fail('saisissez uniquement des 0 et des 1.');
+          if (s.length % 8)
+            return fail(
+              `il faut un nombre de bits multiple de 8 : ${s.length} saisis, il en reste ${s.length % 8} à la fin.`,
+            );
+          const bytes = [];
+          for (let i = 0; i < s.length; i += 8) bytes.push(byteOf(parseInt(s.slice(i, i + 8), 2)));
+          const text = bytes
+            .map((b) => (b.val === 32 || printable(b.val) ? String.fromCharCode(b.val) : ''))
+            .join('');
+          return { s, bytes, text };
+        }
+        function textToBits(text) {
+          const chars = [...String(text)];
+          if (!chars.length) return fail('saisissez un texte.');
+          const bytes = [];
+          for (const c of chars) {
+            const val = c.codePointAt(0);
+            if (val > 255) return fail(`« ${c} » n'existe ni dans la table ascii ni en latin-1.`);
+            bytes.push(byteOf(val));
+          }
+          return { text: String(text), bytes, s: bytes.map((b) => b.bits).join('') };
+        }
+
         return {
           DIG,
           dc,
@@ -1512,6 +1658,10 @@
           FMT,
           ieeeEncode,
           ieeeDecode,
+          ieeeError,
+          decimalError,
+          bitsToText,
+          textToBits,
           UNITS,
           units,
           ranges,
@@ -1741,7 +1891,7 @@
           'u-n': 'numeric',
         };
         const input = (id, value, small = false) =>
-          `<div class="prompt${small ? ' small' : ''}"><input id="${id}" value="${esc(value)}" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done"${keyboards[id] ? ` inputmode="${keyboards[id]}"` : ''}></div>`;
+          `<div class="prompt${small ? ' small' : ''}"><input id="${id}" value="${esc(value)}" autocomplete="off" autocorrect="off" autocapitalize="${id === 'a-n' ? 'off' : 'characters'}" spellcheck="false" enterkeyhint="done"${keyboards[id] ? ` inputmode="${keyboards[id]}"` : ''}></div>`;
         const valueOf = (id) => {
           const el = document.getElementById(id);
           return el.dataset.val ?? el.value;
@@ -2079,6 +2229,7 @@
             const mode = valueOf('f-m');
             const intBits = Math.max(1, Math.min(32, +valueOf('f-i') || 1));
             const fracBits = Math.max(0, Math.min(32, +valueOf('f-f') || 0));
+            showField('f-i', mode === 'e');
             showField('f-f', mode === 'e');
             const split = (k) => (k < intBits ? 'e' : 'mt');
 
@@ -2111,7 +2262,7 @@
               };
             }
 
-            const r = NB.fixedDecode(valueOf('f-n'), intBits);
+            const r = NB.fixedDecode(valueOf('f-n'));
             if (r.err) return r;
             const tiles = [
               ...r.intTerms.map(
@@ -2136,14 +2287,14 @@
             ['9,8125 sur 4 + 4 bits', { 'f-m': 'e', 'f-n': '9,8125', 'f-i': '4', 'f-f': '4' }],
             ['45,375 sur 8 + 8 bits', { 'f-m': 'e', 'f-n': '45,375', 'f-i': '8', 'f-f': '8' }],
             ['0,67 sur 16 + 16 bits', { 'f-m': 'e', 'f-n': '0,67', 'f-i': '16', 'f-f': '16' }],
-            ['décoder 01101010 sur 4 + 4', { 'f-m': 'd', 'f-n': '01101010', 'f-i': '4' }],
+            ['décoder 0110,1010', { 'f-m': 'd', 'f-n': '0110,1010' }],
           ],
-          { 'f-m': { e: { 'f-n': '9,8125', 'f-i': '4', 'f-f': '4' }, d: { 'f-n': '01101010', 'f-i': '4' } } },
+          { 'f-m': { e: { 'f-n': '9,8125', 'f-i': '4', 'f-f': '4' }, d: { 'f-n': '0110,1010' } } },
         );
 
         tab(
           'ieee',
-          'norme ieee 754',
+          'ieee 754',
           () =>
             `<div class="fields">${field(
               'mode',
@@ -2233,11 +2384,32 @@
               const intPart =
                 r.ip > 0n ? `${r.p.int} = ${binSum(NB.weights(r.intBin, 2))}, soit ${r.intBin}` : '0';
               const signWord = r.sign ? 'négatif' : 'positif';
+              const err = NB.ieeeError(shown, r.hex);
+              const absShown = shown.replace('−', '');
+              const errorViz = err
+                ? `<div><h3>7. erreur de codage</h3><div class="scroll"><table class="t"><tbody>
+              <tr><td class="l">valeur saisie</td><td>${shown}</td></tr>
+              <tr><td class="l">valeur stockée</td><td>${err.stored}</td></tr>
+              <tr class="hl"><td class="l">erreur absolue</td><td>${err.abs}</td></tr>
+              <tr><td class="l">erreur relative</td><td>${err.abs === '0' ? '0' : `${sci(err.rel)}, soit ${sci(err.rel * 100)} %`}</td></tr>
+            </tbody></table></div></div>`
+                : '';
+              const errorSteps = !err
+                ? []
+                : err.abs === '0'
+                  ? [
+                      'erreur de codage : la valeur stockée est exactement la valeur saisie, l’erreur est nulle.',
+                    ]
+                  : [
+                      `erreur de codage : on décode ${r.hex} pour retrouver la valeur réellement stockée, ${err.stored}.`,
+                      `erreur absolue : |${err.stored} − (${shown})| = <mark>${err.abs}</mark>.`,
+                      `erreur relative : ${err.abs} ÷ ${absShown} ≈ ${sci(err.rel)}, soit environ ${sci(err.rel * 100)} %.`,
+                    ];
 
               return {
                 answer: `${shown} s’écrit ${ans(r.hex, 16)}`,
                 note: r.check
-                  ? `<span class="ok">✓ identique au codage de la machine.</span> valeur réellement stockée : ${String(r.storedValue).replace('.', ',')}.`
+                  ? `<span class="ok">✓ identique au codage de la machine.</span> valeur réellement stockée : ${err ? err.stored : String(r.storedValue).replace('.', ',')}.`
                   : `attention, la machine donne ${r.machineHex}.`,
                 viz: `
             <div><h3>1. écriture en binaire</h3>${r.ip > 0n ? potence(r.div.rows, 2) + readout(r.div.rows) : ''}${r.steps.length ? fracTable(r.steps, 30) : ''}</div>
@@ -2245,7 +2417,8 @@
             <div><h3>3. exposant : ${r.e} + ${F.bias} = ${r.expStored}</h3>${potence(r.expDiv.rows, 2)}${readout(r.expDiv.rows)}</div>
             <div><h3>4. mantisse et arrondi</h3><div class="cells">${[...r.mantRaw].map((c) => `<span class="bit mt">${c}</span>`).join('')}<span class="bit a">${r.roundBit}</span></div><p class="note">la case orange est le ${F.M + 1}e bit : il n'est pas stocké, il sert seulement à décider de l'arrondi.</p></div>
             <div><h3>5. les trois champs</h3>${ieeeFields(F, String(r.sign), r.expBin, r.mant, [signWord, `${r.expStored} = ${r.e} + ${F.bias}`, `1,${mantShown}`])}</div>
-            ${binToHexSection(r.bits, { cls: fieldCls(F), title: '6. écriture hexadécimale', extra: legend(F) + hexNote(F) }).viz}`,
+            ${binToHexSection(r.bits, { cls: fieldCls(F), title: '6. écriture hexadécimale', extra: legend(F) + hexNote(F) }).viz}
+            ${errorViz}`,
                 steps: [
                   `signe : le nombre est ${signWord}, le bit de signe vaut <mark>${r.sign}</mark>. on continue avec la valeur absolue.`,
                   `partie entière : ${intPart}.`,
@@ -2261,6 +2434,7 @@
                   `on met bout à bout signe, exposant et mantisse : ${r.sign} ${r.expBin} ${r.mant}.`,
                   `pour l'hexadécimal, on reprend les ${F.total} bits à la suite, sans tenir compte des champs.`,
                   ...binToHexSection(r.bits).steps,
+                  ...errorSteps,
                 ],
               };
             }
@@ -2335,8 +2509,87 @@
           },
         );
 
+        const MESSAGE =
+          '010000100111001001100001011101100110111100101100001000000111011001101111011101010111001100100000111010100111010001100101011100110010000001100001011101010010000001100010011011110111010101110100001000000110010001100101001000000110110000100111111010010111011001100001011011000010000000100001';
+        const byteCards = (bytes) =>
+          `<div class="bytes">${bytes.map((b) => `<div class="byte${b.ascii ? '' : ' ext'}"><span class="bb">${b.bits}</span><span class="bv">${b.val} · ${b.hex}</span><b>${esc(b.label)}</b></div>`).join('')}</div>`;
+        const byteSum = (b) => {
+          const sum = binSum(NB.weights(b.bits, 2));
+          return sum.includes('+') ? `${sum} = ${b.val}` : String(b.val);
+        };
+        const byteNote =
+          '<p class="note">chaque carte donne les 8 bits, la valeur en décimal et en hexadécimal, puis le caractère de la table ascii.</p>';
+
+        tab(
+          'texte',
+          'texte et ascii',
+          () =>
+            `<div class="fields">${field(
+              'mode',
+              seg(
+                'a-m',
+                [
+                  ['d', 'décoder des bits'],
+                  ['e', 'coder un texte'],
+                ],
+                'd',
+              ),
+              { wide: true },
+            )}${field('valeur', input('a-n', MESSAGE), { wide: true, forId: 'a-n' })}</div>`,
+          () => {
+            if (valueOf('a-m') === 'd') {
+              const r = NB.bitsToText(valueOf('a-n'));
+              if (r.err) return r;
+              const ext = r.bytes.filter((b) => !b.ascii).length;
+              return {
+                answer: `« ${esc(r.text)} »`,
+                note: ext
+                  ? `${ext} octet${ext > 1 ? 's dépassent' : ' dépasse'} 127 : ${ext > 1 ? 'ils sont lus' : 'il est lu'} en latin-1, l'extension sur 8 bits de la table ascii.`
+                  : '',
+                viz: `<div><h3>${r.bytes.length} octet${r.bytes.length > 1 ? 's' : ''} de 8 bits</h3>${byteCards(r.bytes)}${byteNote}${ext ? '<div class="legend"><span style="--c:var(--accent)">hors de la table ascii, lu en latin-1</span></div>' : ''}</div>`,
+                steps: [
+                  `on a ${r.s.length} bits : on les découpe en ${r.bytes.length} octet${r.bytes.length > 1 ? 's' : ''} de 8 bits, en partant de la gauche, car le texte se lit dans l'ordre.`,
+                  ...r.bytes.map((b) =>
+                    b.ascii
+                      ? `${b.bits} = ${byteSum(b)}, soit « <mark>${esc(b.label)}</mark> » dans la table ascii`
+                      : `${b.bits} = ${byteSum(b)}, hors de la table ascii (0 à 127) : en latin-1, ${b.val} correspond à « <mark>${esc(b.label)}</mark> »`,
+                  ),
+                  `on met les caractères bout à bout : <mark>${esc(r.text)}</mark>.`,
+                ],
+              };
+            }
+            const r = NB.textToBits(valueOf('a-n'));
+            if (r.err) return r;
+            const spaced = r.bytes.map((b) => b.bits).join(' ');
+            return {
+              answer: `« ${esc(r.text)} » s’écrit ${ans(spaced, 2)}`,
+              viz: `<div><h3>un octet par caractère</h3>${byteCards(r.bytes)}${byteNote}</div>`,
+              steps: [
+                'chaque caractère est remplacé par son code dans la table ascii, écrit sur 8 bits.',
+                ...r.bytes.map(
+                  (b) =>
+                    `« ${esc(b.label)} » = ${b.val}${b.ascii ? '' : ' en latin-1'} = ${binSum(NB.weights(b.bits, 2))}, soit ${b.bits}`,
+                ),
+                `on met les octets bout à bout : <mark>${spaced}</mark>.`,
+              ],
+            };
+          },
+          [
+            ['décoder le message de l’éval', { 'a-m': 'd', 'a-n': MESSAGE }],
+            ['décoder 01001111 01001011', { 'a-m': 'd', 'a-n': '01001111 01001011' }],
+            ['coder « BTS SIO »', { 'a-m': 'e', 'a-n': 'BTS SIO' }],
+          ],
+          { 'a-m': { d: { 'a-n': MESSAGE }, e: { 'a-n': 'BTS SIO' } } },
+        );
+
         const unitSelect = (id, selected) =>
           `<select id="${id}">${NB.UNITS.map((u) => `<option${u.k === selected ? ' selected' : ''}>${u.k}</option>`).join('')}</select>`;
+        const sci = (x) => {
+          if (!x) return '0';
+          const [m, exp] = x.toExponential(2).split('e');
+          if (+exp >= -3 && +exp <= 3) return String(+x.toPrecision(3)).replace('.', ',');
+          return `${m.replace('.', ',')} × 10<sup>${exp.replace('-', '−').replace('+', '')}</sup>`;
+        };
         const fr = (x) => x.toLocaleString('fr-FR', { maximumFractionDigits: 6 });
         const powLabel = (l) => l.replace(/\^(\d+)/, '<sup>$1</sup>');
 
@@ -2416,10 +2669,17 @@
                 const r = NB.fixedEncode(valueOf('f-n'), +valueOf('f-i') || 1, +valueOf('f-f') || 0);
                 return r.err ? null : { 'f-n': `${r.intBin},${r.fracBin}` };
               }
-              const r = NB.fixedDecode(valueOf('f-n'), +valueOf('f-i') || 1);
+              const r = NB.fixedDecode(valueOf('f-n'));
               return r.err
                 ? null
                 : { 'f-n': r.value, 'f-i': String(r.ib.length), 'f-f': String(r.fb.length) };
+            },
+          },
+          texte: {
+            'a-m': (to) => {
+              const r = to === 'e' ? NB.bitsToText(valueOf('a-n')) : NB.textToBits(valueOf('a-n'));
+              if (r.err) return null;
+              return { 'a-n': to === 'e' ? r.text : r.bytes.map((b) => b.bits).join(' ') };
             },
           },
           ieee: {
@@ -2455,6 +2715,7 @@
             complement: 'coder et décoder des entiers négatifs sur n bits',
             fixe: 'partie entière et partie décimale sur un nombre fixe de bits',
             ieee: 'signe, exposant et mantisse, en float ou en double',
+            texte: 'des octets aux caractères avec la table ascii, et inversement',
             unites: 'ko, Kio, Go, Gio et plages de valeurs sur n bits',
           },
         };
