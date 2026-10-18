@@ -1,0 +1,2655 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta
+      name="description"
+      content="correction pas à pas des exercices de numération : conversions, divisions successives, complément à deux, virgule fixe et norme IEEE 754."
+    />
+    <meta name="theme-color" content="#000000" />
+    <title>correcteur de numération</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&display=swap"
+    />
+    <style>
+      :root {
+        --bg: #000000;
+        --panel: #0b0b0b;
+        --ink: #ededed;
+        --dim: #8b8b8b;
+        --line: #262626;
+        --grid: #171717;
+        --accent: #d97757;
+        --accent-soft: #2b1810;
+        --ok: #8bc48a;
+        --err: #ef7d6d;
+        --err-soft: #2a1212;
+        --sign: #c39bff;
+        --sign-soft: #1d1430;
+        --exp: #6fcf97;
+        --exp-soft: #0e2417;
+        --mant: #7aa7ff;
+        --mant-soft: #0f1a30;
+        --chip: #161616;
+        --scrim: rgba(0, 0, 0, 0.7);
+        --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Mono', Menlo, Consolas, monospace;
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+      html {
+        -webkit-text-size-adjust: 100%;
+        padding-top: env(safe-area-inset-top, 0px);
+        padding-bottom: env(safe-area-inset-bottom, 0px);
+      }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--ink);
+        font: 15px/1.6 var(--mono);
+      }
+      body::before {
+        content: '';
+        position: fixed;
+        inset: 0 0 auto;
+        height: env(safe-area-inset-top, 0px);
+        background: var(--bg);
+        z-index: 35;
+      }
+      [hidden] {
+        display: none !important;
+      }
+      button {
+        font-family: inherit;
+        cursor: pointer;
+        touch-action: manipulation;
+      }
+      button:focus-visible,
+      input:focus-visible,
+      select:focus-visible {
+        outline: 2px solid var(--accent);
+        outline-offset: 2px;
+      }
+
+      .wrap {
+        max-width: 1320px;
+        margin: 0 auto;
+        padding-left: max(16px, env(safe-area-inset-left, 0px));
+        padding-right: max(16px, env(safe-area-inset-right, 0px));
+        padding-block: 20px 56px;
+      }
+
+      .topbar {
+        display: none;
+      }
+      .compact .topbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        position: sticky;
+        top: env(safe-area-inset-top, 0px);
+        z-index: 30;
+        background: var(--bg);
+        padding-block: 10px;
+        margin-bottom: 12px;
+        border-bottom: 1px solid var(--line);
+      }
+      .burger {
+        display: grid;
+        place-items: center;
+        width: 42px;
+        height: 42px;
+        flex: none;
+        color: var(--ink);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+      }
+      .burger svg {
+        width: 20px;
+        height: 20px;
+      }
+      .crumb {
+        color: var(--dim);
+        font-size: 14px;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+      }
+      .crumb b {
+        color: var(--ink);
+        font-weight: 500;
+      }
+
+      .home {
+        display: grid;
+        gap: 18px;
+        padding-top: 6px;
+      }
+      .home h1 {
+        margin: 0;
+        font-size: clamp(20px, 3vw, 26px);
+        font-weight: 700;
+        text-wrap: balance;
+      }
+      .home h1 span {
+        color: var(--accent);
+        margin-right: 10px;
+      }
+      .home p {
+        margin: 0;
+        color: var(--dim);
+      }
+      .home ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(min(300px, 100%), 1fr));
+        gap: 10px;
+      }
+      .home li button {
+        width: 100%;
+        height: 100%;
+        text-align: left;
+        display: grid;
+        gap: 4px;
+        padding: 14px 16px;
+        color: var(--ink);
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+      }
+      .home li button:hover {
+        border-color: var(--accent);
+      }
+      .home li b {
+        font-weight: 700;
+      }
+      .home li b::before {
+        content: '❯ ';
+        color: var(--accent);
+      }
+      .home li span {
+        color: var(--dim);
+        font-size: 13px;
+      }
+
+      .tabs {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+        margin: 0 0 16px;
+        border-bottom: 1px solid var(--line);
+      }
+      .tabs button {
+        font-size: 13px;
+        color: var(--dim);
+        background: none;
+        border: 0;
+        border-bottom: 2px solid transparent;
+        padding: 8px 7px;
+        margin-bottom: -1px;
+        white-space: nowrap;
+      }
+      .tabs button:hover {
+        color: var(--ink);
+      }
+      .tabs button[aria-selected='true'] {
+        color: var(--ink);
+        border-bottom-color: var(--accent);
+      }
+      .compact .tabs {
+        display: none;
+      }
+
+      .scrim {
+        position: fixed;
+        inset: 0;
+        background: var(--scrim);
+        z-index: 40;
+      }
+      .drawer {
+        position: fixed;
+        top: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 50;
+        width: min(300px, 86vw);
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        background: var(--panel);
+        border-right: 1px solid var(--line);
+        padding: calc(env(safe-area-inset-top, 0px) + 14px) 12px calc(env(safe-area-inset-bottom, 0px) + 14px)
+          max(12px, env(safe-area-inset-left, 0px));
+        transform: translateX(-100%);
+        visibility: hidden;
+        transition:
+          transform 0.2s ease,
+          visibility 0.2s;
+      }
+      .drawer.open {
+        transform: none;
+        visibility: visible;
+        box-shadow: 0 0 40px rgba(0, 0, 0, 0.25);
+      }
+      .drawer-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 4px 0 10px;
+      }
+      .drawer-head .drawer-home {
+        width: auto;
+        height: auto;
+        padding: 6px 8px;
+        margin-left: -8px;
+        font-size: 15px;
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .drawer-head .drawer-home:hover {
+        color: var(--accent);
+      }
+      .tabs button.home-link {
+        color: var(--accent);
+        font-size: 15px;
+        padding-inline: 10px 12px;
+      }
+      .drawer-head button {
+        width: 38px;
+        height: 38px;
+        border: 0;
+        border-radius: 8px;
+        background: none;
+        color: var(--dim);
+        font-size: 18px;
+      }
+      .drawer-head button:hover {
+        background: var(--chip);
+        color: var(--ink);
+      }
+      .drawer ul {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 2px;
+        overflow-y: auto;
+      }
+      .drawer li button {
+        width: 100%;
+        text-align: left;
+        font-size: 14px;
+        color: var(--ink);
+        background: none;
+        border: 0;
+        border-radius: 8px;
+        padding: 11px 10px;
+        min-height: 44px;
+      }
+      .drawer li button::before {
+        content: '❯ ';
+        color: var(--accent);
+        opacity: 0;
+      }
+      .drawer li button:hover {
+        background: var(--chip);
+      }
+      .drawer li button[aria-current='true'] {
+        background: var(--chip);
+        color: var(--accent);
+      }
+      .drawer li button[aria-current='true']::before {
+        opacity: 1;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .drawer {
+          transition: none;
+        }
+      }
+
+      .enonce {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        display: grid;
+        gap: 14px;
+      }
+      .fields {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 14px;
+        align-items: end;
+      }
+      .field {
+        display: grid;
+        gap: 5px;
+        min-width: 0;
+        max-width: 100%;
+      }
+      .field > label,
+      .field > span {
+        font-size: 12px;
+        color: var(--dim);
+      }
+      .prompt {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 0 14px 0 12px;
+        background: var(--bg);
+        max-width: 100%;
+        min-width: 0;
+      }
+      .prompt.small {
+        width: 110px;
+      }
+      .prompt.small input {
+        flex: 1;
+        width: auto;
+      }
+      .prompt::before {
+        content: '❯';
+        color: var(--accent);
+      }
+      .prompt:focus-within {
+        border-color: var(--accent);
+      }
+      .prompt input {
+        flex: 0 1 auto;
+        width: 20ch;
+        max-width: 100%;
+        min-width: 0;
+        border: 0;
+        background: transparent;
+        color: var(--ink);
+        font: 16px var(--mono);
+        padding: 9px 0;
+      }
+      .prompt input:focus-visible {
+        outline: none;
+      }
+      select {
+        font: 15px var(--mono);
+        color: var(--ink);
+        background: var(--bg);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 9px 10px;
+      }
+      .seg {
+        display: inline-flex;
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        overflow: hidden;
+        background: var(--bg);
+      }
+      .seg button {
+        font-size: 14px;
+        border: 0;
+        background: transparent;
+        color: var(--dim);
+        padding: 9px 12px;
+      }
+      .seg button::before {
+        content: '❯ ';
+        opacity: 0;
+      }
+      .seg button[aria-pressed='true'] {
+        color: var(--accent);
+        background: var(--accent-soft);
+      }
+      .seg button[aria-pressed='true']::before {
+        opacity: 1;
+      }
+      .ex {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        font-size: 13px;
+        color: var(--dim);
+      }
+      .ex button {
+        font-size: 13px;
+        color: var(--ink);
+        background: var(--chip);
+        border: 0;
+        border-radius: 6px;
+        padding: 6px 10px;
+        min-height: 32px;
+        text-align: left;
+        overflow-wrap: anywhere;
+      }
+      .ex button:hover {
+        color: var(--accent);
+      }
+
+      .out {
+        display: grid;
+        gap: 14px;
+        margin-top: 14px;
+      }
+      .result {
+        padding: 2px 2px 4px;
+      }
+      .compact .result {
+        scroll-margin-top: 76px;
+      }
+      .line {
+        display: flex;
+        gap: 10px;
+        align-items: baseline;
+        font-weight: 700;
+      }
+      .line::before {
+        content: '●';
+        color: var(--accent);
+        font-size: 12px;
+      }
+      .ans {
+        margin: 4px 0 0 22px;
+        font-size: clamp(18px, 3vw, 24px);
+        font-weight: 700;
+        line-height: 1.4;
+        overflow-wrap: anywhere;
+      }
+      .ans sub {
+        font-size: 0.55em;
+        color: var(--dim);
+        font-weight: 400;
+      }
+      .tail {
+        margin: 4px 0 0 22px;
+        color: var(--dim);
+        font-size: 14px;
+        display: flex;
+        gap: 10px;
+      }
+      .tail::before {
+        content: '└';
+      }
+      .error {
+        border: 1px solid var(--err);
+        background: var(--err-soft);
+        border-radius: 10px;
+        padding: 12px 14px;
+      }
+      .error .line::before {
+        color: var(--err);
+      }
+      .error .tail {
+        color: var(--ink);
+      }
+
+      .box {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 14px 16px;
+        min-width: 0;
+      }
+      .box > .line {
+        margin-bottom: 12px;
+      }
+      .viz {
+        display: grid;
+        gap: 20px;
+      }
+      .viz-body {
+        display: grid;
+        gap: 22px;
+        background-image: radial-gradient(var(--grid) 1px, transparent 1px);
+        background-size: 16px 16px;
+      }
+      .viz h3 {
+        font-size: 14px;
+        font-weight: 700;
+        margin: 0 0 8px;
+      }
+      .note {
+        margin: 8px 0 0;
+        color: var(--dim);
+        font-size: 13px;
+      }
+      .scroll {
+        overflow-x: auto;
+        max-width: 100%;
+      }
+      .steps ol {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 8px;
+      }
+      .steps li {
+        display: grid;
+        grid-template-columns: 22px minmax(0, 1fr);
+      }
+      .steps li::before {
+        content: '●';
+        color: var(--accent);
+        font-size: 10px;
+        line-height: 2.4;
+      }
+      mark {
+        background: var(--accent-soft);
+        color: var(--accent);
+        font-weight: 700;
+        padding: 0 3px;
+        border-radius: 3px;
+      }
+      .ok {
+        color: var(--ok);
+      }
+
+      svg.pot {
+        display: block;
+      }
+      svg.pot text {
+        font: 16px var(--mono);
+        fill: var(--ink);
+      }
+      svg.pot text.r {
+        fill: var(--accent);
+        font-weight: 700;
+      }
+      svg.pot text.q {
+        fill: var(--dim);
+      }
+      svg.pot text.rl {
+        font-size: 12px;
+        fill: var(--accent);
+      }
+      svg.pot line {
+        stroke: var(--ink);
+        stroke-width: 1.4;
+      }
+      svg.pot rect.rbox {
+        fill: var(--accent-soft);
+      }
+      .readout {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        align-items: center;
+        font-size: 13px;
+        color: var(--dim);
+        margin-top: 6px;
+      }
+      .readout b {
+        font-size: 16px;
+        color: var(--accent);
+        background: var(--accent-soft);
+        border-radius: 5px;
+        padding: 0 7px;
+      }
+
+      .bits {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px 8px;
+      }
+      .nib {
+        display: grid;
+        gap: 4px;
+        justify-items: center;
+      }
+      .cells {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 2px;
+      }
+      .bit {
+        position: relative;
+        width: 24px;
+        height: 30px;
+        display: grid;
+        place-items: center;
+        font-size: 15px;
+        font-weight: 700;
+        border: 1.5px solid var(--line);
+        border-radius: 5px;
+        background: var(--panel);
+      }
+      .bit i {
+        position: absolute;
+        bottom: -16px;
+        font-size: 10px;
+        color: var(--dim);
+        font-style: normal;
+        font-weight: 400;
+      }
+      .bits.w .cells {
+        margin-bottom: 14px;
+      }
+      .bit.s {
+        border-color: var(--sign);
+        background: var(--sign-soft);
+        color: var(--sign);
+      }
+      .bit.e {
+        border-color: var(--exp);
+        background: var(--exp-soft);
+        color: var(--exp);
+      }
+      .bit.mt {
+        border-color: var(--mant);
+        background: var(--mant-soft);
+        color: var(--mant);
+      }
+      .bit.a {
+        border-color: var(--accent);
+        background: var(--accent-soft);
+        color: var(--accent);
+      }
+      .bit.dim {
+        color: var(--dim);
+        opacity: 0.6;
+      }
+      .hx {
+        font-size: 14px;
+        font-weight: 700;
+        color: var(--bg);
+        background: var(--ink);
+        border-radius: 4px;
+        padding: 0 8px;
+      }
+      .legend {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px 16px;
+        font-size: 13px;
+        color: var(--dim);
+        margin-top: 10px;
+      }
+      .legend span::before {
+        content: '';
+        display: inline-block;
+        width: 10px;
+        height: 10px;
+        border-radius: 3px;
+        margin-right: 6px;
+        background: var(--c);
+      }
+      .rowlab {
+        display: grid;
+        grid-template-columns: 130px minmax(0, 1fr);
+        gap: 10px;
+        align-items: center;
+      }
+      .rowlab > span {
+        font-size: 13px;
+        color: var(--dim);
+      }
+      .stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .ieee-fields {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 16px 22px;
+        align-items: flex-start;
+      }
+      .fblock {
+        display: grid;
+        gap: 6px;
+        min-width: 0;
+        max-width: 100%;
+        border-top: 3px solid var(--c);
+        padding-top: 8px;
+      }
+      .fblock .cap {
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--c);
+      }
+      .fblock .val {
+        font-size: 13px;
+        color: var(--dim);
+      }
+      .fblock.s {
+        --c: var(--sign);
+      }
+      .fblock.e {
+        --c: var(--exp);
+      }
+      .fblock.mt {
+        --c: var(--mant);
+        flex: 1 1 300px;
+      }
+
+      .cols {
+        display: grid;
+        width: max-content;
+        font-size: 20px;
+      }
+      .cols span {
+        width: 28px;
+        text-align: center;
+        height: 32px;
+        line-height: 32px;
+      }
+      .cols .c {
+        font-size: 13px;
+        color: var(--accent);
+        height: 20px;
+        line-height: 20px;
+        font-weight: 700;
+      }
+      .cols .f {
+        color: var(--dim);
+        opacity: 0.45;
+      }
+      .cols .rr {
+        border-top: 2px solid var(--ink);
+        font-weight: 700;
+      }
+
+      .wcols {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+      }
+      .wc {
+        display: grid;
+        justify-items: center;
+        gap: 2px;
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 8px;
+        padding: 6px 10px;
+        min-width: 58px;
+      }
+      .wc b {
+        font-size: 22px;
+        color: var(--mant);
+      }
+      .wc span {
+        font-size: 13px;
+        color: var(--dim);
+      }
+      .wc em {
+        font-size: 14px;
+        font-weight: 700;
+        font-style: normal;
+      }
+      .wc.zero {
+        opacity: 0.45;
+      }
+
+      table.t {
+        border-collapse: collapse;
+        font-variant-numeric: tabular-nums;
+        background: var(--panel);
+      }
+      table.t th,
+      table.t td {
+        border: 1px solid var(--line);
+        padding: 4px 10px;
+        text-align: right;
+        font-size: 14px;
+      }
+      table.t th {
+        font-size: 12px;
+        font-weight: 500;
+        color: var(--dim);
+        text-align: center;
+      }
+      table.t td.b {
+        text-align: center;
+        color: var(--accent);
+        font-weight: 700;
+        background: var(--accent-soft);
+      }
+      table.t td.l {
+        text-align: left;
+      }
+      table.t tr.hl td {
+        background: var(--accent-soft);
+        font-weight: 700;
+      }
+      .norm {
+        font-size: 17px;
+        line-height: 1.9;
+        overflow-wrap: anywhere;
+      }
+      .norm .one {
+        color: var(--accent);
+        font-weight: 700;
+      }
+      .norm .mt {
+        color: var(--mant);
+      }
+      .norm .hint {
+        color: var(--dim);
+        font-size: 13px;
+        margin-left: 12px;
+      }
+
+      @media (max-width: 560px) {
+        .fields {
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+        }
+        .field.wide {
+          grid-column: 1 / -1;
+        }
+        .prompt,
+        .prompt.small,
+        select {
+          width: 100%;
+        }
+        .prompt input {
+          flex: 1;
+        }
+        .seg {
+          display: flex;
+        }
+        .seg button {
+          flex: 1;
+          min-height: 44px;
+          padding-inline: 6px;
+        }
+        .enonce,
+        .box {
+          padding: 14px 12px;
+        }
+        .rowlab {
+          grid-template-columns: 1fr;
+          gap: 4px;
+        }
+        .ans,
+        .tail {
+          margin-left: 0;
+        }
+      }
+      @media (prefers-reduced-motion: no-preference) {
+        .out > * {
+          animation: rise 0.2s ease both;
+        }
+        @keyframes rise {
+          from {
+            opacity: 0.5;
+            transform: translateY(3px);
+          }
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="topbar">
+        <button
+          class="burger"
+          id="burger"
+          type="button"
+          aria-label="ouvrir la liste des exercices"
+          aria-expanded="false"
+          aria-controls="drawer"
+        >
+          <svg
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M4 7h16M4 12h16M4 17h16" />
+          </svg>
+        </button>
+        <span class="crumb">numération / <b id="crumb"></b></span>
+      </div>
+
+      <nav class="tabs" id="tabs" role="tablist" aria-label="exercices"></nav>
+
+      <main id="panel"></main>
+    </div>
+
+    <div class="scrim" id="scrim" hidden></div>
+    <aside class="drawer" id="drawer" aria-label="exercices" inert>
+      <div class="drawer-head">
+        <button type="button" class="drawer-home" data-id="accueil">✻ numération</button>
+        <button type="button" id="drawer-close" aria-label="fermer la liste">✕</button>
+      </div>
+      <ul id="drawer-list"></ul>
+    </aside>
+
+    <script>
+      const NB = (() => {
+        const DIG = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+        const dc = (d) => DIG[Number(d)];
+        const dv = (c) => DIG.indexOf(String(c).toUpperCase());
+        const clean = (s) => String(s).replace(/[\s_₀-₉]/g, '');
+        const group = (s, g = 4) => {
+          let o = '';
+          for (let i = 0; i < s.length; i++) {
+            if (i && (s.length - i) % g === 0) o += ' ';
+            o += s[i];
+          }
+          return o;
+        };
+        const flip = (s) => [...s].map((c) => (c === '0' ? '1' : '0')).join('');
+        const bitsToHex = (bits) => {
+          const p = bits.padStart(Math.ceil(bits.length / 4) * 4, '0');
+          let h = '';
+          for (let i = 0; i < p.length; i += 4) h += dc(parseInt(p.slice(i, i + 4), 2));
+          return h;
+        };
+        const fail = (err) => ({ err });
+
+        function divisions(nStr, base) {
+          const s = clean(nStr);
+          if (!/^\d+$/.test(s)) return fail('saisissez un entier positif écrit en base 10 (chiffres 0 à 9).');
+          if (!(base >= 2 && base <= 36)) return fail('la base doit être comprise entre 2 et 36.');
+          const b = BigInt(base);
+          let n = BigInt(s);
+          const rows = [];
+          if (n === 0n) rows.push({ d: 0n, q: 0n, r: 0n });
+          while (n > 0n) {
+            rows.push({ d: n, q: n / b, r: n % b });
+            n /= b;
+          }
+          return {
+            n: BigInt(s),
+            base,
+            rows,
+            result: rows
+              .map((r) => dc(r.r))
+              .reverse()
+              .join(''),
+          };
+        }
+
+        function weights(str, base) {
+          const s = clean(str)
+            .replace(/^0[xb]/i, '')
+            .toUpperCase();
+          if (!s) return fail('saisissez un nombre.');
+          for (const c of s) {
+            const v = dv(c);
+            if (v < 0 || v >= base) return fail(`« ${c} » n'est pas un chiffre valide en base ${base}.`);
+          }
+          const b = BigInt(base),
+            L = s.length;
+          const terms = [...s].map((c, i) => {
+            const pos = L - 1 - i,
+              d = BigInt(dv(c)),
+              pow = b ** BigInt(pos);
+            return { c, d, pos, pow, val: d * pow };
+          });
+          return { s, base, terms, total: terms.reduce((a, t) => a + t.val, 0n) };
+        }
+
+        function binToHex(str) {
+          const s = clean(str).replace(/^0b/i, '');
+          if (!/^[01]+$/.test(s)) return fail('un nombre binaire ne contient que des 0 et des 1.');
+          const pad = (4 - (s.length % 4)) % 4,
+            p = '0'.repeat(pad) + s,
+            groups = [];
+          for (let i = 0; i < p.length; i += 4) {
+            const g = p.slice(i, i + 4),
+              v = parseInt(g, 2);
+            groups.push({ bits: g, val: v, digit: dc(v) });
+          }
+          return {
+            s,
+            pad,
+            groups,
+            result: groups
+              .map((g) => g.digit)
+              .join('')
+              .replace(/^0+(?=.)/, ''),
+          };
+        }
+        function hexToBin(str) {
+          const s = clean(str).replace(/^0x/i, '').toUpperCase();
+          if (!/^[0-9A-F]+$/.test(s))
+            return fail('un nombre hexadécimal utilise les chiffres 0 à 9 et les lettres A à F.');
+          const groups = [...s].map((c) => ({
+            digit: c,
+            val: dv(c),
+            bits: dv(c).toString(2).padStart(4, '0'),
+          }));
+          const full = groups.map((g) => g.bits).join('');
+          return { s, groups, full, result: full.replace(/^0+(?=.)/, '') };
+        }
+
+        function addSub(aStr, bStr, op) {
+          let a = clean(aStr).replace(/^0b/i, ''),
+            b = clean(bStr).replace(/^0b/i, '');
+          if (!/^[01]+$/.test(a) || !/^[01]+$/.test(b))
+            return fail('les deux nombres doivent être en binaire (0 et 1 uniquement).');
+          a = a.replace(/^0+(?=.)/, '');
+          b = b.replace(/^0+(?=.)/, '');
+          const va0 = BigInt('0b' + a),
+            vb0 = BigInt('0b' + b);
+          let swapped = false;
+          if (op === '-' && va0 < vb0) {
+            [a, b] = [b, a];
+            swapped = true;
+          }
+          const va = BigInt('0b' + a),
+            vb = BigInt('0b' + b);
+          const W = Math.max(a.length, b.length) + 1;
+          const A = a.padStart(W, '0'),
+            B = b.padStart(W, '0');
+          const res = Array(W).fill('0'),
+            carry = Array(W).fill(''),
+            cols = [];
+          let c = 0;
+          for (let i = W - 1; i >= 0; i--) {
+            const x = +A[i],
+              y = +B[i],
+              cin = c;
+            let r;
+            if (op === '+') {
+              const s = x + y + c;
+              r = s % 2;
+              c = s >> 1;
+            } else {
+              let d = x - y - c;
+              if (d < 0) {
+                d += 2;
+                c = 1;
+              } else c = 0;
+              r = d;
+            }
+            res[i] = String(r);
+            if (c && i > 0) carry[i - 1] = '1';
+            cols.push({ pos: W - 1 - i, x, y, cin, r, cout: c });
+          }
+          const R = res.join('');
+          const vr = op === '+' ? va + vb : va - vb;
+          return {
+            op,
+            a,
+            b,
+            A,
+            B,
+            W,
+            R,
+            carry,
+            cols,
+            va: va0,
+            vb: vb0,
+            vr,
+            swapped,
+            aLen: a.length,
+            bLen: b.length,
+            result: (swapped ? '−' : '') + R.replace(/^0+(?=.)/, ''),
+            check: BigInt('0b' + R) === vr,
+          };
+        }
+
+        function tcEncode(vStr, n) {
+          const s = clean(vStr).replace('−', '-');
+          if (!/^[-+]?\d+$/.test(s)) return fail('saisissez un entier relatif, par exemple −37.');
+          const v = BigInt(s),
+            N = BigInt(n);
+          const min = -(1n << (N - 1n)),
+            max = (1n << (N - 1n)) - 1n;
+          if (v < min || v > max) return fail(`sur ${n} bits, on ne peut coder que de ${min} à ${max}.`);
+          const abs = v < 0n ? -v : v;
+          const absBin = abs.toString(2).padStart(n, '0');
+          const out = { v, n, min, max, abs, absBin, neg: v < 0n };
+          if (!out.neg) {
+            out.result = absBin;
+          } else {
+            out.inv = flip(absBin);
+            out.result = ((BigInt('0b' + out.inv) + 1n) & ((1n << N) - 1n)).toString(2).padStart(n, '0');
+            out.shortcut = (1n << N) + v;
+          }
+          out.hex = n % 4 === 0 ? bitsToHex(out.result) : null;
+          return out;
+        }
+        function tcDecode(str, mode) {
+          let bits;
+          if (mode === 'hex') {
+            const h = hexToBin(str);
+            if (h.err) return h;
+            bits = h.full;
+          } else {
+            bits = clean(str).replace(/^0b/i, '');
+            if (!/^[01]+$/.test(bits)) return fail('saisissez une suite de 0 et de 1.');
+          }
+          const n = bits.length,
+            u = BigInt('0b' + bits);
+          const out = { bits, n, u, neg: bits[0] === '1', hex: n % 4 === 0 ? bitsToHex(bits) : null };
+          if (!out.neg) out.value = u;
+          else {
+            out.inv = flip(bits);
+            out.mag = BigInt('0b' + out.inv) + 1n;
+            out.magBin = out.mag.toString(2).padStart(n, '0');
+            out.value = -out.mag;
+            out.pow = 1n << BigInt(n);
+          }
+          return out;
+        }
+
+        function parseDec(str) {
+          const s = clean(str).replace(',', '.').replace('−', '-');
+          const m = /^([+-]?)(\d*)(?:\.(\d*))?$/.exec(s);
+          if (!m || (m[2] === '' && (m[3] || '') === '')) return null;
+          return {
+            neg: m[1] === '-',
+            int: (m[2] || '0').replace(/^0+(?=.)/, ''),
+            frac: (m[3] || '').replace(/0+$/, ''),
+          };
+        }
+        function mul2(d) {
+          const a = d.split('');
+          let c = 0;
+          for (let i = a.length - 1; i >= 0; i--) {
+            const v = +a[i] * 2 + c;
+            a[i] = String(v % 10);
+            c = v >= 10 ? 1 : 0;
+          }
+          return { bit: c, d: a.join('') };
+        }
+        const isZero = (d) => !/[1-9]/.test(d);
+        const showFrac = (ip, d) => ip + ',' + (d.replace(/0+$/, '') || '0');
+        function fracStep(d) {
+          const { bit, d: nd } = mul2(d);
+          return { step: { before: showFrac('0', d), after: showFrac(String(bit), nd), bit }, d: nd };
+        }
+        function fracToDec(bits) {
+          if (!bits || !bits.includes('1')) return '0';
+          const k = BigInt(bits.length),
+            mask = (1n << k) - 1n;
+          let num = BigInt('0b' + bits),
+            o = '';
+          while (num > 0n) {
+            num *= 10n;
+            o += String(num >> k);
+            num &= mask;
+          }
+          return o;
+        }
+
+        function fixedEncode(str, iBits, fBits) {
+          const p = parseDec(str);
+          if (!p) return fail('saisissez un nombre décimal, par exemple 9,8125.');
+          if (p.neg) return fail('ici la virgule fixe code des nombres positifs.');
+          const ip = BigInt(p.int);
+          if (ip >= 1n << BigInt(iBits))
+            return fail(
+              `la partie entière ${ip} ne tient pas sur ${iBits} bits (maximum ${(1n << BigInt(iBits)) - 1n}).`,
+            );
+          const steps = [];
+          let d = p.frac || '0';
+          while (steps.length < fBits && !isZero(d)) {
+            const r = fracStep(d);
+            steps.push(r.step);
+            d = r.d;
+          }
+          const intBin = ip.toString(2).padStart(iBits, '0');
+          const fracBin = steps
+            .map((s) => s.bit)
+            .join('')
+            .padEnd(fBits, '0');
+          return {
+            p,
+            iBits,
+            fBits,
+            ip,
+            div: divisions(p.int, 2),
+            intBin,
+            steps,
+            fracBin,
+            exact: isZero(d),
+            stored: ip + ',' + fracToDec(fracBin),
+          };
+        }
+        function fixedDecode(str, iBits) {
+          let s = clean(str).replace('.', ',');
+          let ib, fb;
+          if (s.includes(',')) {
+            [ib, fb] = s.split(',');
+          } else {
+            if (s.length < iBits) s = s.padStart(iBits, '0');
+            ib = s.slice(0, iBits);
+            fb = s.slice(iBits);
+          }
+          if (!/^[01]*$/.test(ib) || !/^[01]*$/.test(fb) || !(ib + fb))
+            return fail('saisissez une suite de 0 et de 1 (avec ou sans virgule).');
+          ib = ib || '0';
+          const intTerms = [...ib].map((c, i) => ({ c, pos: ib.length - 1 - i })).filter((t) => t.c === '1');
+          const fracTerms = [...fb]
+            .map((c, i) => ({ c, pos: -(i + 1), w: '0,' + fracToDec('0'.repeat(i) + '1') }))
+            .filter((t) => t.c === '1');
+          const iv = BigInt('0b' + ib);
+          return { ib, fb, intTerms, fracTerms, iv, value: iv + ',' + fracToDec(fb) };
+        }
+
+        const FMT = {
+          float: { E: 8, M: 23, bias: 127, total: 32, name: 'float (32 bits)' },
+          double: { E: 11, M: 52, bias: 1023, total: 64, name: 'double (64 bits)' },
+        };
+        function machine(x, F) {
+          const dvw = new DataView(new ArrayBuffer(8));
+          if (F.total === 32) {
+            dvw.setFloat32(0, x);
+            return dvw.getUint32(0).toString(16).toUpperCase().padStart(8, '0');
+          }
+          dvw.setFloat64(0, x);
+          return dvw.getBigUint64(0).toString(16).toUpperCase().padStart(16, '0');
+        }
+        function hexToValue(hex, F) {
+          const dvw = new DataView(new ArrayBuffer(8));
+          if (F.total === 32) {
+            dvw.setUint32(0, parseInt(hex, 16));
+            return dvw.getFloat32(0);
+          }
+          dvw.setBigUint64(0, BigInt('0x' + hex));
+          return dvw.getFloat64(0);
+        }
+        function ieeeEncode(str, fk) {
+          const F = FMT[fk],
+            p = parseDec(str);
+          if (!p) return fail('saisissez un nombre réel, par exemple −9,2 ou 12,375.');
+          const sign = p.neg ? 1 : 0,
+            ip = BigInt(p.int),
+            intBin = ip.toString(2);
+          const x = parseFloat((p.neg ? '-' : '') + p.int + '.' + (p.frac || '0'));
+          const base = { F, p, sign, ip, intBin, div: divisions(p.int, 2), machineHex: machine(x, F) };
+          if (ip === 0n && isZero(p.frac || '0')) {
+            const bits = sign + '0'.repeat(F.total - 1);
+            return { ...base, special: 'zero', bits, hex: bitsToHex(bits) };
+          }
+          const steps = [];
+          let d = p.frac || '0',
+            e;
+          if (ip > 0n) {
+            e = intBin.length - 1;
+            const need = Math.max(0, F.M + 2 - e);
+            while (steps.length < need && !isZero(d)) {
+              const r = fracStep(d);
+              steps.push(r.step);
+              d = r.d;
+            }
+          } else {
+            let first = -1;
+            const limit = F.bias + F.M + 3;
+            while (first < 0 && steps.length < limit) {
+              const r = fracStep(d);
+              steps.push(r.step);
+              d = r.d;
+              if (r.step.bit === 1) first = steps.length;
+            }
+            e = -first;
+            if (first < 0 || e < 1 - F.bias) {
+              return {
+                ...base,
+                special: 'denormal',
+                bits: BigInt('0x' + base.machineHex)
+                  .toString(2)
+                  .padStart(F.total, '0'),
+                hex: base.machineHex,
+              };
+            }
+            const target = steps.length + F.M + 2;
+            while (steps.length < target && !isZero(d)) {
+              const r = fracStep(d);
+              steps.push(r.step);
+              d = r.d;
+            }
+          }
+          const fracBin = steps.map((s) => s.bit).join(''),
+            exactFrac = isZero(d);
+          const stream = (ip > 0n ? intBin : '') + fracBin,
+            lead = stream.indexOf('1'),
+            rest = stream.slice(lead + 1);
+          const mantRaw = rest.slice(0, F.M).padEnd(F.M, '0');
+          const roundBit = rest[F.M] === '1' ? 1 : 0;
+          const restAfter = rest.slice(F.M + 1);
+          const sticky = restAfter.includes('1') || !exactFrac;
+          const up = !!roundBit && (sticky || mantRaw.endsWith('1'));
+          const tie = !!roundBit && !sticky;
+          let mant = mantRaw,
+            e2 = e,
+            carryOut = false;
+          if (up) {
+            let m = BigInt('0b' + mantRaw) + 1n;
+            if (m >> BigInt(F.M)) {
+              m = 0n;
+              e2++;
+              carryOut = true;
+            }
+            mant = m.toString(2).padStart(F.M, '0');
+          }
+          const expStored = e2 + F.bias;
+          if (expStored >= 2 ** F.E - 1) {
+            const bits = sign + '1'.repeat(F.E) + '0'.repeat(F.M);
+            return { ...base, special: 'inf', bits, hex: bitsToHex(bits) };
+          }
+          const expBin = expStored.toString(2).padStart(F.E, '0');
+          const bits = sign + expBin + mant,
+            hex = bitsToHex(bits);
+          const shownRest = rest.slice(0, F.M + 1).replace(/0+$/, '');
+          return {
+            ...base,
+            steps,
+            fracBin,
+            exactFrac,
+            e: e2,
+            e0: e,
+            stream,
+            lead,
+            rest,
+            mantRaw,
+            roundBit,
+            restAfter,
+            sticky,
+            up,
+            tie,
+            carryOut,
+            mant,
+            expStored,
+            expBin,
+            expDiv: divisions(String(expStored), 2),
+            bits,
+            hex,
+            fixedRepr: (ip > 0n ? intBin : '0') + ',' + (fracBin || '0') + (exactFrac ? '' : '…'),
+            normalized:
+              '1,' +
+              (shownRest || '0') +
+              (rest.length > F.M + 1 && rest.slice(F.M + 1).includes('1') ? '…' : ''),
+            storedValue: hexToValue(hex, F),
+            check: hex === base.machineHex,
+          };
+        }
+        function ieeeDecode(str, mode = 'hex') {
+          let s = clean(str);
+          let bits;
+          if (mode === 'bin') {
+            s = s.replace(/^0b/i, '');
+            if (!/^[01]+$/.test(s)) return fail('saisissez uniquement des 0 et des 1.');
+            if (s.length !== 32 && s.length !== 64)
+              return fail(`il faut 32 bits (float) ou 64 bits (double) : ${s.length} saisis.`);
+            bits = s;
+          } else {
+            s = s.replace(/^0x/i, '').toUpperCase();
+            if (!/^[0-9A-F]+$/.test(s))
+              return fail('un nombre hexadécimal utilise les chiffres 0 à 9 et les lettres A à F.');
+            if (s.length !== 8 && s.length !== 16)
+              return fail(`il faut 8 chiffres hexadécimaux (float) ou 16 (double) : ${s.length} saisis.`);
+            bits = hexToBin(s).full;
+          }
+          const F = bits.length === 32 ? FMT.float : FMT.double;
+          const sign = +bits[0],
+            expBin = bits.slice(1, 1 + F.E),
+            mantBin = bits.slice(1 + F.E);
+          const expStored = parseInt(expBin, 2),
+            hex = bitsToHex(bits),
+            value = hexToValue(hex, F);
+          const out = {
+            mode,
+            F,
+            bits,
+            hex,
+            sign,
+            expBin,
+            mantBin,
+            expStored,
+            expW: weights(expBin, 2),
+            value,
+          };
+          if (expStored === 0) {
+            out.kind = mantBin.includes('1') ? 'denormal' : 'zero';
+            return out;
+          }
+          if (expStored === 2 ** F.E - 1) {
+            out.kind = mantBin.includes('1') ? 'nan' : 'inf';
+            return out;
+          }
+          out.kind = 'normal';
+          const e = expStored - F.bias,
+            m = mantBin.replace(/0+$/, ''),
+            sig = '1' + m;
+          out.e = e;
+          out.m = m;
+          out.normalized = '1,' + (m || '0');
+          if (e >= -64 && e <= 80) {
+            let ib, fb;
+            if (e >= 0) {
+              ib = sig.slice(0, e + 1).padEnd(e + 1, '0');
+              fb = sig.slice(e + 1);
+            } else {
+              ib = '0';
+              fb = '0'.repeat(-e - 1) + sig;
+            }
+            out.fixedInt = ib;
+            out.fixedFrac = fb;
+            out.exact =
+              (sign ? '−' : '') +
+              BigInt('0b' + ib).toString() +
+              (fb.includes('1') ? ',' + fracToDec(fb) : '');
+          }
+          return out;
+        }
+
+        const UNITS = [
+          { k: 'bit', f: 1 / 8, label: '1/8 o' },
+          { k: 'o', f: 1, label: '1 o' },
+          { k: 'ko', f: 1e3, label: '10^3 o' },
+          { k: 'Mo', f: 1e6, label: '10^6 o' },
+          { k: 'Go', f: 1e9, label: '10^9 o' },
+          { k: 'To', f: 1e12, label: '10^12 o' },
+          { k: 'Kio', f: 2 ** 10, label: '2^10 o' },
+          { k: 'Mio', f: 2 ** 20, label: '2^20 o' },
+          { k: 'Gio', f: 2 ** 30, label: '2^30 o' },
+          { k: 'Tio', f: 2 ** 40, label: '2^40 o' },
+        ];
+        function units(vStr, from, to) {
+          const v = parseFloat(clean(vStr).replace(',', '.'));
+          if (!isFinite(v)) return fail('saisissez une quantité, par exemple 500.');
+          const U1 = UNITS.find((u) => u.k === from),
+            U2 = UNITS.find((u) => u.k === to);
+          const bytes = v * U1.f;
+          return { v, U1, U2, bytes, res: bytes / U2.f };
+        }
+        function ranges(n) {
+          const N = BigInt(n);
+          return { n, umax: (1n << N) - 1n, smin: -(1n << (N - 1n)), smax: (1n << (N - 1n)) - 1n };
+        }
+
+        return {
+          DIG,
+          dc,
+          dv,
+          group,
+          flip,
+          bitsToHex,
+          divisions,
+          weights,
+          binToHex,
+          hexToBin,
+          addSub,
+          tcEncode,
+          tcDecode,
+          parseDec,
+          fracToDec,
+          fixedEncode,
+          fixedDecode,
+          FMT,
+          ieeeEncode,
+          ieeeDecode,
+          UNITS,
+          units,
+          ranges,
+        };
+      })();
+
+      (() => {
+        const esc = (s) =>
+          String(s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
+        const nf = (x) =>
+          String(x)
+            .replace('-', '−')
+            .replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+        const pw = (b, e) => `${b}<sup>${e}</sup>`;
+        const ans = (v, b) => `${v}<sub>${b}</sub>`;
+        const G = NB.group;
+
+        function potence(rows, base) {
+          if (rows.length > 18) return '';
+          const fs = 16,
+            cw = fs * 0.6,
+            lh = 30,
+            pad = 8,
+            parts = [];
+          let x = 6,
+            y = 22,
+            maxX = 0;
+          const text = (x, y, s, cls = '', anchor = 'start') =>
+            `<text x="${x.toFixed(1)}" y="${y}" class="${cls}" text-anchor="${anchor}">${esc(s)}</text>`;
+          const line = (x1, y1, x2, y2) =>
+            `<line x1="${x1.toFixed(1)}" y1="${y1}" x2="${x2.toFixed(1)}" y2="${y2}"/>`;
+
+          rows.forEach((r, i) => {
+            const D = String(r.d),
+              Q = String(r.q),
+              B = String(base),
+              R = String(r.r);
+            const wD = D.length * cw;
+            const xl = x + wD + pad;
+            const wq = Math.max(B.length, Q.length) * cw;
+            const wR = R.length * cw;
+            const rx = x + wD - wR;
+
+            parts.push(
+              text(x, y, D),
+              line(xl, y - fs, xl, y + lh + 4),
+              text(xl + pad, y, B),
+              line(xl, y + 7, xl + wq + pad * 2, y + 7),
+            );
+            parts.push(
+              `<rect class="rbox" x="${(rx - 4).toFixed(1)}" y="${y + lh - fs + 1}" width="${(wR + 8).toFixed(1)}" height="${fs + 6}" rx="4"/>`,
+            );
+            parts.push(text(rx, y + lh, R, 'r'));
+            if (r.r >= 10n) parts.push(text(rx + wR / 2, y + lh + 18, '= ' + NB.dc(r.r), 'rl', 'middle'));
+            if (i === rows.length - 1) parts.push(text(xl + pad, y + lh, Q, 'q'));
+
+            maxX = Math.max(maxX, xl + wq + pad * 3);
+            x = xl + pad;
+            y += lh;
+          });
+
+          const w = Math.ceil(maxX),
+            h = y + 28;
+          return `<div class="scroll"><svg class="pot" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" role="img" aria-label="divisions successives posées">${parts.join('')}</svg></div>`;
+        }
+
+        function readout(rows) {
+          const digits = rows.map((r) => NB.dc(r.r)).reverse();
+          return `<div class="readout">restes lus du dernier au premier : ${digits.map((d) => `<b>${d}</b>`).join('')}</div>`;
+        }
+
+        function bits(b, { cls = () => '', hex = true, weights = false } = {}) {
+          const n = b.length,
+            groups = [];
+          let i = n;
+          while (i > 0) {
+            const s = Math.max(0, i - 4);
+            groups.unshift([s, i]);
+            i = s;
+          }
+          const html = groups.map(([s, e]) => {
+            let cells = '';
+            for (let k = s; k < e; k++) {
+              cells += `<span class="bit ${cls(k)}" title="bit de poids ${n - 1 - k}">${b[k]}${weights ? `<i>${n - 1 - k}</i>` : ''}</span>`;
+            }
+            const digit = hex ? `<span class="hx">${NB.dc(parseInt(b.slice(s, e), 2))}</span>` : '';
+            return `<span class="nib"><span class="cells">${cells}</span>${digit}</span>`;
+          });
+          return `<div class="bits${weights ? ' w' : ''}">${html.join('')}</div>`;
+        }
+
+        function plainBits(b, cls) {
+          return `<div class="cells">${[...b].map((c) => `<span class="bit ${cls}">${c}</span>`).join('')}</div>`;
+        }
+
+        function ieeeFields(F, sign, expBin, mant, captions) {
+          return `<div class="ieee-fields">
+      <div class="fblock s"><span class="cap">signe</span>${plainBits(sign, 's')}<span class="val">${captions[0]}</span></div>
+      <div class="fblock e"><span class="cap">exposant, ${F.E} bits</span>${plainBits(expBin, 'e')}<span class="val">${captions[1]}</span></div>
+      <div class="fblock mt"><span class="cap">mantisse, ${F.M} bits</span>${plainBits(mant, 'mt')}<span class="val">${captions[2]}</span></div>
+    </div>`;
+        }
+
+        const row = (label, html) =>
+          `<div class="rowlab"><span>${label}</span><div style="min-width:0">${html}</div></div>`;
+
+        function fracTable(steps, max = 40) {
+          if (!steps.length) return '<p class="note">pas de partie décimale.</p>';
+          const body = steps
+            .slice(0, max)
+            .map((s) => `<tr><td>${s.before} × 2</td><td>= ${s.after}</td><td class="b">${s.bit}</td></tr>`)
+            .join('');
+          const more =
+            steps.length > max ? `<p class="note">et ${steps.length - max} lignes de plus.</p>` : '';
+          return `<div class="scroll"><table class="t"><thead><tr><th>partie décimale × 2</th><th>résultat</th><th>bit</th></tr></thead><tbody>${body}</tbody></table></div>${more}<p class="note">les bits se lisent de haut en bas, juste après la virgule.</p>`;
+        }
+
+        function weightCols(terms, base) {
+          const cols = terms.map(
+            (t) =>
+              `<div class="wc${t.d === 0n ? ' zero' : ''}"><b>${t.c}</b><span>× ${pw(base, t.pos)}</span><em>${nf(t.val)}</em></div>`,
+          );
+          return `<div class="wcols">${cols.join('')}</div>`;
+        }
+
+        function divTable(rows, base) {
+          const extra = base > 10;
+          const body = rows
+            .map(
+              (r) =>
+                `<tr><td>${nf(r.d)}</td><td>${base}</td><td>${nf(r.q)}</td><td class="b">${r.r}</td>${extra ? `<td class="b">${NB.dc(r.r)}</td>` : ''}</tr>`,
+            )
+            .join('');
+          return `<div class="scroll"><table class="t"><thead><tr><th>dividende</th><th>diviseur</th><th>quotient</th><th>reste</th>${extra ? '<th>chiffre</th>' : ''}</tr></thead><tbody>${body}</tbody></table></div>`;
+        }
+
+        const divSteps = (rows, base) =>
+          rows.map(
+            (r) =>
+              `${nf(r.d)} = ${base} × ${nf(r.q)} + <mark>${r.r}</mark>${r.r >= 10n ? `, le reste ${r.r} s'écrit <mark>${NB.dc(r.r)}</mark>` : ''}`,
+          );
+        const binSum = (w) =>
+          w.terms
+            .filter((t) => t.d)
+            .map((t) => nf(t.val))
+            .join(' + ') || '0';
+        const nibbleSum = (b) => [8, 4, 2, 1].filter((p, i) => b[i] === '1').join(' + ') || '0';
+        function digitLine(g) {
+          const parts = [`<mark>${g.digit}</mark>`];
+          const sum = nibbleSum(g.bits);
+          if (g.val >= 10) parts.push(String(g.val));
+          if (sum.includes('+')) parts.push(sum);
+          return `${parts.join(' = ')}, soit ${g.bits}`;
+        }
+        function nibbleLine(g) {
+          const sum = nibbleSum(g.bits);
+          const value = sum.includes('+') ? `${sum} = ${g.val}` : String(g.val);
+          return `${g.bits} = ${value}, soit le chiffre <mark>${g.digit}</mark>`;
+        }
+        function hexToBinSection(str, { cls, title = 'développement en binaire', extra = '' } = {}) {
+          const h = NB.hexToBin(str);
+          return {
+            h,
+            viz: `<div><h3>${title}</h3>${bits(h.full, { cls })}<p class="note">chaque chiffre hexadécimal, écrit sous son paquet, est remplacé par ses 4 bits.</p>${extra}</div>`,
+            steps: [
+              'chaque chiffre hexadécimal est remplacé par exactement 4 bits, zéros compris.',
+              ...h.groups.map(digitLine),
+              `on met les paquets bout à bout : ${G(h.full)}.`,
+            ],
+          };
+        }
+
+        function binToHexSection(
+          bitString,
+          { cls, title = 'regroupement par paquets de 4 bits', extra = '' } = {},
+        ) {
+          const r = NB.binToHex(bitString);
+          const padded = '0'.repeat(r.pad) + r.s;
+          const digits = r.groups.map((g) => g.digit).join('');
+          const pad = r.pad
+            ? [
+                `le paquet de gauche est incomplet : on ajoute ${r.pad} zéro${r.pad > 1 ? 's' : ''} devant (${padded.slice(0, 4)}).`,
+              ]
+            : [];
+          return {
+            r,
+            digits,
+            viz: `<div><h3>${title}</h3>${bits(padded, { cls: (k) => (k < r.pad ? 'dim' : cls ? cls(k - r.pad) : '') })}${extra}</div>`,
+            steps: [
+              `on découpe en paquets de 4 bits en partant de la droite : ${G(r.s)}.`,
+              ...pad,
+              ...r.groups.map(nibbleLine),
+              `on écrit les chiffres dans l'ordre : <mark>${digits}</mark>.`,
+            ],
+          };
+        }
+
+        function render(o) {
+          if (o.err)
+            return `<div class="error"><div class="line">saisie invalide</div><div class="tail">${esc(o.err)}</div></div>`;
+          return `<section class="result"><div class="line">réponse</div><div class="ans">${o.answer}</div>${o.note ? `<div class="tail"><span>${o.note}</span></div>` : ''}</section>
+      <section class="box viz"><div class="line">schéma</div><div class="viz-body">${o.viz}</div></section>
+      <section class="box steps"><div class="line">étapes</div><ol>${o.steps.map((s) => `<li><span>${s}</span></li>`).join('')}</ol></section>`;
+        }
+
+        function sizeInputs() {
+          panel.querySelectorAll('.prompt:not(.small) input').forEach((el) => {
+            el.style.width = `${Math.max(20, el.value.length + 2)}ch`;
+          });
+        }
+
+        const TABS = [];
+        const tab = (id, name, form, run, examples, presets = {}) =>
+          TABS.push({ id, name, form, run, examples, presets });
+        const seg = (id, options, value) =>
+          `<div class="seg" id="${id}" data-val="${value}">${options.map(([v, l]) => `<button type="button" data-v="${v}" aria-pressed="${v === value}">${l}</button>`).join('')}</div>`;
+        const field = (label, html, { wide = false, forId = '' } = {}) =>
+          `<div class="field${wide ? ' wide' : ''}">${forId ? `<label for="${forId}">${label}</label>` : `<span>${label}</span>`}${html}</div>`;
+        const keyboards = {
+          'd-n': 'numeric',
+          'o-a': 'numeric',
+          'o-b': 'numeric',
+          'f-n': 'decimal',
+          'u-v': 'decimal',
+          'f-i': 'numeric',
+          'f-f': 'numeric',
+          'u-n': 'numeric',
+        };
+        const input = (id, value, small = false) =>
+          `<div class="prompt${small ? ' small' : ''}"><input id="${id}" value="${esc(value)}" autocomplete="off" autocorrect="off" autocapitalize="characters" spellcheck="false" enterkeyhint="done"${keyboards[id] ? ` inputmode="${keyboards[id]}"` : ''}></div>`;
+        const valueOf = (id) => {
+          const el = document.getElementById(id);
+          return el.dataset.val ?? el.value;
+        };
+        const showField = (id, visible) => {
+          document.getElementById(id).closest('.field').hidden = !visible;
+        };
+        const baseSelect = (id, selected) =>
+          `<select id="${id}">${[2, 8, 16].map((b) => `<option value="${b}"${b === selected ? ' selected' : ''}>base ${b}</option>`).join('')}</select>`;
+
+        tab(
+          'decimal',
+          'depuis le décimal',
+          () =>
+            `<div class="fields">${field('nombre en base 10', input('d-n', '756'), { wide: true, forId: 'd-n' })}${field('base cible', baseSelect('d-b', 16), { forId: 'd-b' })}</div>`,
+          () => {
+            const b = +valueOf('d-b');
+            const r = NB.divisions(valueOf('d-n'), b);
+            if (r.err) return r;
+            const w = NB.weights(r.result, b);
+            const asBits = b === 2 ? r.result : b === 16 ? NB.hexToBin(r.result).full : null;
+            return {
+              answer: `${ans(nf(r.n), 10)} = ${ans(b === 2 ? G(r.result) : r.result, b)}`,
+              viz: `<div><h3>divisions successives</h3>${potence(r.rows, b) || divTable(r.rows, b)}${readout(r.rows)}</div>${asBits ? `<div><h3>résultat en bits</h3>${bits(asBits, { weights: true, hex: b === 16 })}</div>` : ''}`,
+              steps: [
+                `on divise ${nf(r.n)} par ${b}, puis chaque quotient par ${b}, jusqu'à obtenir un quotient égal à 0.`,
+                ...divSteps(r.rows, b),
+                `le quotient vaut 0, on s'arrête. on lit les restes du dernier au premier : <mark>${r.result}</mark>.`,
+                `vérification : ${
+                  w.terms
+                    .filter((t) => t.d)
+                    .map((t) => `${t.d} × ${pw(b, t.pos)}`)
+                    .join(' + ') || '0'
+                } = ${nf(w.total)} <span class="ok">✓</span>`,
+              ],
+            };
+          },
+          [
+            ['57 en base 2', { 'd-n': '57', 'd-b': '2' }],
+            ['200 en base 2', { 'd-n': '200', 'd-b': '2' }],
+            ['1000 en base 2', { 'd-n': '1000', 'd-b': '2' }],
+            ['500 en base 16', { 'd-n': '500', 'd-b': '16' }],
+            ['4660 en base 16', { 'd-n': '4660', 'd-b': '16' }],
+            ['48879 en base 16', { 'd-n': '48879', 'd-b': '16' }],
+          ],
+        );
+
+        tab(
+          'poids',
+          'vers le décimal',
+          () =>
+            `<div class="fields">${field('nombre', input('w-n', '3FA'), { wide: true, forId: 'w-n' })}${field('écrit en', baseSelect('w-b', 16), { forId: 'w-b' })}</div>`,
+          () => {
+            const b = +valueOf('w-b');
+            const r = NB.weights(valueOf('w-n'), b);
+            if (r.err) return r;
+            const letters = r.terms.filter((t) => t.d >= 10n).map((t) => `${t.c} = ${t.d}`);
+            const sum =
+              b === 2
+                ? `on additionne les poids des bits à 1 : ${binSum(r)} = <mark>${nf(r.total)}</mark>.`
+                : `${r.terms.map((t) => `${t.d} × ${nf(t.pow)}`).join(' + ')} = ${r.terms.map((t) => nf(t.val)).join(' + ')} = <mark>${nf(r.total)}</mark>.`;
+            return {
+              answer: `${ans(b === 2 ? G(r.s) : r.s, b)} = ${ans(nf(r.total), 10)}`,
+              viz: `<div><h3>chaque chiffre multiplié par son poids</h3>${weightCols(r.terms, b)}</div>${b === 2 ? `<div><h3>positions des bits</h3>${bits(r.s, { weights: true, hex: false, cls: (k) => (r.s[k] === '1' ? 'mt' : 'dim') })}</div>` : ''}`,
+              steps: [
+                `on numérote les positions de droite à gauche en commençant à 0. le chiffre en position p vaut chiffre × ${pw(b, 'p')}.`,
+                ...(letters.length ? [`en hexadécimal, les lettres valent : ${letters.join(', ')}.`] : []),
+                `poids utilisés : ${r.terms.map((t) => `${pw(b, t.pos)} = ${nf(t.pow)}`).join(', ')}.`,
+                sum,
+              ],
+            };
+          },
+          [
+            ['11010110 en base 2', { 'w-n': '11010110', 'w-b': '2' }],
+            ['100101011 en base 2', { 'w-n': '100101011', 'w-b': '2' }],
+            ['3FA en base 16', { 'w-n': '3FA', 'w-b': '16' }],
+            ['7C en base 16', { 'w-n': '7C', 'w-b': '16' }],
+            ['2AF en base 16', { 'w-n': '2AF', 'w-b': '16' }],
+          ],
+          { 'w-b': { 2: { 'w-n': '11010110' }, 8: { 'w-n': '755' }, 16: { 'w-n': '3FA' } } },
+        );
+
+        tab(
+          'binhex',
+          'binaire et hexadécimal',
+          () =>
+            `<div class="fields">${field(
+              'sens',
+              seg(
+                'bh-m',
+                [
+                  ['b', 'binaire vers hexadécimal'],
+                  ['h', 'hexadécimal vers binaire'],
+                ],
+                'b',
+              ),
+              { wide: true },
+            )}${field('nombre', input('bh-n', '1101011000011'), { wide: true, forId: 'bh-n' })}</div>`,
+          () => {
+            if (valueOf('bh-m') === 'b') {
+              const check = NB.binToHex(valueOf('bh-n'));
+              if (check.err) return check;
+              const hx = binToHexSection(valueOf('bh-n'));
+              const steps = [...hx.steps];
+              if (hx.digits !== hx.r.result)
+                steps.push(`sans les zéros de tête : <mark>${hx.r.result}</mark>.`);
+              return { answer: `${ans(G(hx.r.s), 2)} = ${ans(hx.r.result, 16)}`, viz: hx.viz, steps };
+            }
+            const check = NB.hexToBin(valueOf('bh-n'));
+            if (check.err) return check;
+            const hx = hexToBinSection(valueOf('bh-n'));
+            const steps = [...hx.steps];
+            if (hx.h.full !== hx.h.result)
+              steps.push(`sans les zéros de tête : <mark>${G(hx.h.result)}</mark>.`);
+            return { answer: `${ans(hx.h.s, 16)} = ${ans(G(hx.h.result), 2)}`, viz: hx.viz, steps };
+          },
+          [
+            ['1101011000011 en hexadécimal', { 'bh-m': 'b', 'bh-n': '1101011000011' }],
+            ['10101011101010111 en hexadécimal', { 'bh-m': 'b', 'bh-n': '10101011101010111' }],
+            ['A5F en binaire', { 'bh-m': 'h', 'bh-n': 'A5F' }],
+            ['3F7 en binaire', { 'bh-m': 'h', 'bh-n': '3F7' }],
+          ],
+          { 'bh-m': { b: { 'bh-n': '1101011000011' }, h: { 'bh-n': 'A5F' } } },
+        );
+
+        tab(
+          'operations',
+          'addition et soustraction',
+          () =>
+            `<div class="fields">${field('premier nombre', input('o-a', '10110110'), { wide: true, forId: 'o-a' })}${field(
+              'opération',
+              seg(
+                'o-op',
+                [
+                  ['+', 'addition'],
+                  ['-', 'soustraction'],
+                ],
+                '+',
+              ),
+              { wide: true },
+            )}${field('second nombre', input('o-b', '1101101'), { wide: true, forId: 'o-b' })}</div>`,
+          () => {
+            const op = valueOf('o-op');
+            const r = NB.addSub(valueOf('o-a'), valueOf('o-b'), op);
+            if (r.err) return r;
+            const W = r.W,
+              sym = op === '+' ? '+' : '−',
+              lead = r.R.search(/1/);
+            const cell = (s, c = '') => `<span class="${c}">${s}</span>`;
+            const grid = [
+              cell('', 'c') + r.carry.map((c) => cell(c, 'c')).join(''),
+              cell('') + [...r.A].map((c, i) => cell(c, i < W - r.aLen ? 'f' : '')).join(''),
+              cell(sym) + [...r.B].map((c, i) => cell(c, i < W - r.bLen ? 'f' : '')).join(''),
+              cell('', 'rr') +
+                [...r.R].map((c, i) => cell(c, 'rr' + (lead >= 0 && i < lead ? ' f' : ''))).join(''),
+            ].join('');
+            const word = op === '+' ? 'retenues' : 'emprunts';
+            const columns =
+              r.cols.length > 17
+                ? []
+                : r.cols.map((c) => {
+                    if (op === '+') {
+                      return `colonne ${pw(2, c.pos)} : ${c.x} + ${c.y}${c.cin ? ' + 1 (retenue)' : ''} = ${c.x + c.y + c.cin}, on écrit <mark>${c.r}</mark>${c.cout ? ' et on retient 1' : ''}.`;
+                    }
+                    const borrow =
+                      c.x - c.y - c.cin < 0 ? `, on emprunte 2 : ${c.x + 2} − ${c.y + c.cin}` : '';
+                    return `colonne ${pw(2, c.pos)} : ${c.x} − ${c.y}${c.cin ? ' − 1 (emprunt)' : ''}${borrow}, on écrit <mark>${c.r}</mark>${c.cout ? ' et on reporte un emprunt' : ''}.`;
+                  });
+            const total = op === '+' ? r.va + r.vb : r.va - r.vb;
+            const shownA = G(NB.addSub(valueOf('o-a'), '0', '+').a);
+            const shownB = G(NB.addSub(valueOf('o-b'), '0', '+').a);
+            const shownR = r.result.startsWith('−') ? '−' + G(r.result.slice(1)) : G(r.result);
+            return {
+              answer: `${ans(shownA, 2)} ${sym} ${ans(shownB, 2)} = ${ans(shownR, 2)}`,
+              note: r.swapped
+                ? 'le second nombre est plus grand : on calcule second − premier et le résultat est négatif.'
+                : '',
+              viz: `<div><h3>opération posée</h3><div class="scroll"><div class="cols" style="grid-template-columns:repeat(${W + 1},28px)">${grid}</div></div><p class="note">au-dessus, en couleur : les ${word}.</p></div>`,
+              steps: [
+                op === '+'
+                  ? 'on aligne les nombres à droite et on additionne colonne par colonne. 1 + 1 = 10 : on écrit 0 et on retient 1. 1 + 1 + 1 = 11 : on écrit 1 et on retient 1.'
+                  : 'on aligne les nombres à droite et on soustrait colonne par colonne. pour 0 − 1, on emprunte 2 à la colonne de gauche : 2 − 1 = 1, et la colonne de gauche reçoit un emprunt de 1.',
+                ...columns,
+                `résultat : <mark>${r.result}</mark>.`,
+                `vérification en décimal : ${nf(r.va)} ${sym} ${nf(r.vb)} = ${nf(total)} <span class="ok">✓</span>`,
+              ],
+            };
+          },
+          [
+            ['10110110 + 1101101', { 'o-a': '10110110', 'o-op': '+', 'o-b': '1101101' }],
+            ['11001010 − 1011011', { 'o-a': '11001010', 'o-op': '-', 'o-b': '1011011' }],
+            ['1111 + 1', { 'o-a': '1111', 'o-op': '+', 'o-b': '1' }],
+          ],
+          {
+            'o-op': {
+              '+': { 'o-a': '10110110', 'o-b': '1101101' },
+              '-': { 'o-a': '11001010', 'o-b': '1011011' },
+            },
+          },
+        );
+
+        const bitsSelect = (id, selected) =>
+          `<select id="${id}">${[4, 8, 16, 32].map((b) => `<option value="${b}"${b === selected ? ' selected' : ''}>${b} bits</option>`).join('')}</select>`;
+
+        tab(
+          'complement',
+          'complément à deux',
+          () =>
+            `<div class="fields">${field(
+              'mode',
+              seg(
+                'c-m',
+                [
+                  ['e', 'coder un entier'],
+                  ['d', 'décoder des bits'],
+                ],
+                'e',
+              ),
+              { wide: true },
+            )}${field('valeur', input('c-n', '-37'), { wide: true, forId: 'c-n' })}${field('taille', bitsSelect('c-b', 8), { forId: 'c-b' })}${field(
+              'saisie en',
+              seg(
+                'c-f',
+                [
+                  ['bin', 'binaire'],
+                  ['hex', 'hexadécimal'],
+                ],
+                'bin',
+              ),
+              { wide: true },
+            )}</div>`,
+          () => {
+            const mode = valueOf('c-m');
+            showField('c-b', mode === 'e');
+            showField('c-f', mode === 'd');
+            const signCls = (k) => (k === 0 ? 's' : '');
+
+            if (mode === 'e') {
+              const n = +valueOf('c-b');
+              const r = NB.tcEncode(valueOf('c-n'), n);
+              if (r.err) return r;
+              const steps = [
+                `sur ${n} bits, on peut coder de ${nf(r.min)} à ${nf(r.max)} : ${nf(r.v)} est dans la plage <span class="ok">✓</span>`,
+                `on écrit |${nf(r.v)}| = ${nf(r.abs)} en binaire (${binSum(NB.weights(r.abs.toString(2), 2))}) sur ${n} bits : ${G(r.absBin)}.`,
+              ];
+              if (!r.neg) {
+                steps.push('le nombre est positif : il s’écrit tel quel et le bit de signe vaut 0.');
+              } else {
+                steps.push(
+                  `on inverse tous les bits : ${G(r.inv)}.`,
+                  `on ajoute 1 : ${G(r.inv)} + 1 = <mark>${G(r.result)}</mark>.`,
+                  'le bit de gauche vaut 1 : le nombre est bien négatif.',
+                );
+              }
+              const hx = r.hex
+                ? binToHexSection(r.result, { cls: signCls, title: 'écriture hexadécimale' })
+                : null;
+              if (hx) steps.push(...hx.steps);
+              if (r.neg)
+                steps.push(
+                  `vérification : ${pw(2, n)} − ${nf(r.abs)} = ${nf(r.shortcut)}, qui s’écrit bien ${G(r.result)} en binaire <span class="ok">✓</span>`,
+                );
+              const rows = r.neg
+                ? row('inversion', bits(r.inv, { hex: false, cls: () => 'a' })) +
+                  row('plus 1', bits(r.result, { hex: false, cls: signCls }))
+                : row('résultat', bits(r.result, { hex: false, cls: signCls }));
+              return {
+                answer: `${nf(r.v)} s’écrit ${ans(G(r.result), 2)}${r.hex ? ` = ${ans(r.hex, 16)}` : ''}`,
+                viz: `<div><div class="stack">${row(`|n| = ${nf(r.abs)}`, bits(r.absBin, { hex: false }))}${rows}</div><div class="legend"><span style="--c:var(--sign)">bit de signe</span></div></div>${hx ? hx.viz : ''}`,
+                steps,
+              };
+            }
+
+            const r = NB.tcDecode(valueOf('c-n'), valueOf('c-f'));
+            if (r.err) return r;
+            const hx = valueOf('c-f') === 'hex' ? hexToBinSection(valueOf('c-n')) : null;
+            const steps = [
+              ...(hx ? hx.steps : [`on a ${r.n} bits : ${G(r.bits)}.`]),
+              `le bit de signe vaut ${r.bits[0]} : le nombre est ${r.neg ? 'négatif' : 'positif'}.`,
+            ];
+            if (!r.neg) {
+              steps.push(
+                `on convertit directement : ${binSum(NB.weights(r.bits, 2))} = <mark>${nf(r.value)}</mark>.`,
+              );
+            } else {
+              steps.push(
+                `on inverse tous les bits : ${G(r.inv)}.`,
+                `on ajoute 1 : ${G(r.magBin)} = ${binSum(NB.weights(r.magBin, 2))} = ${nf(r.mag)}.`,
+                `on remet le signe : <mark>${nf(r.value)}</mark>.`,
+                `vérification : ${nf(r.u)} − ${pw(2, r.n)} = ${nf(r.u)} − ${nf(r.pow)} = ${nf(r.value)} <span class="ok">✓</span>`,
+              );
+            }
+            const rows = r.neg
+              ? row('inversion', bits(r.inv, { hex: false, cls: () => 'a' })) +
+                row('plus 1', bits(r.magBin, { hex: false }))
+              : '';
+            return {
+              answer: `${valueOf('c-f') === 'hex' ? `${ans(r.hex, 16)} = ` : ''}${ans(G(r.bits), 2)} = ${nf(r.value)}`,
+              viz: `${hx ? hx.viz : ''}<div class="stack">${row('bits reçus', bits(r.bits, { hex: false, cls: signCls }))}${rows}</div>`,
+              steps,
+            };
+          },
+          [
+            ['−37 sur 8 bits', { 'c-m': 'e', 'c-n': '-37', 'c-b': '8' }],
+            ['−100 sur 8 bits', { 'c-m': 'e', 'c-n': '-100', 'c-b': '8' }],
+            ['−300 sur 16 bits', { 'c-m': 'e', 'c-n': '-300', 'c-b': '16' }],
+            ['−2024 sur 16 bits', { 'c-m': 'e', 'c-n': '-2024', 'c-b': '16' }],
+            ['−23 sur 16 bits', { 'c-m': 'e', 'c-n': '-23', 'c-b': '16' }],
+            ['décoder 11001001', { 'c-m': 'd', 'c-n': '11001001', 'c-f': 'bin' }],
+            ['décoder FFE9', { 'c-m': 'd', 'c-n': 'FFE9', 'c-f': 'hex' }],
+          ],
+          {
+            'c-m': { e: { 'c-n': '-37', 'c-b': '8' }, d: { 'c-n': '11001001', 'c-f': 'bin' } },
+            'c-f': { bin: { 'c-n': '11001001' }, hex: { 'c-n': 'FFE9' } },
+          },
+        );
+
+        tab(
+          'fixe',
+          'virgule fixe',
+          () =>
+            `<div class="fields">${field(
+              'mode',
+              seg(
+                'f-m',
+                [
+                  ['e', 'coder un décimal'],
+                  ['d', 'décoder des bits'],
+                ],
+                'e',
+              ),
+              { wide: true },
+            )}${field('valeur', input('f-n', '9,8125'), { wide: true, forId: 'f-n' })}${field('bits entiers', input('f-i', '4', true), { forId: 'f-i' })}${field('bits décimaux', input('f-f', '4', true), { forId: 'f-f' })}</div>`,
+          () => {
+            const mode = valueOf('f-m');
+            const intBits = Math.max(1, Math.min(32, +valueOf('f-i') || 1));
+            const fracBits = Math.max(0, Math.min(32, +valueOf('f-f') || 0));
+            showField('f-f', mode === 'e');
+            const split = (k) => (k < intBits ? 'e' : 'mt');
+
+            if (mode === 'e') {
+              const r = NB.fixedEncode(valueOf('f-n'), intBits, fracBits);
+              if (r.err) return r;
+              const shown = r.p.int + (r.p.frac ? ',' + r.p.frac : '');
+              const fracList = r.steps
+                .slice(0, 8)
+                .map((s) => `${s.before} × 2 = ${s.after}, bit ${s.bit}`)
+                .join(' ; ');
+              return {
+                answer: `${shown} s’écrit ${ans(G(r.intBin) + ',' + r.fracBin.replace(/(.{4})(?=.)/g, '$1 '), 2)}`,
+                note: r.exact
+                  ? ''
+                  : `la partie décimale ne tombe pas juste sur ${fracBits} bits : la valeur réellement stockée est ${r.stored}.`,
+                viz: `<div><h3>partie entière, divisions par 2</h3>${potence(r.div.rows, 2)}${readout(r.div.rows)}</div>
+            <div><h3>partie décimale, multiplications par 2</h3>${fracTable(r.steps)}</div>
+            <div><h3>mot de ${intBits} + ${fracBits} bits</h3>${bits(r.intBin + r.fracBin, { hex: false, cls: split, weights: true })}<div class="legend"><span style="--c:var(--exp)">partie entière</span><span style="--c:var(--mant)">partie décimale</span></div></div>`,
+                steps: [
+                  `partie entière : ${r.p.int} = ${binSum(NB.weights(r.ip.toString(2), 2))}, soit ${r.ip.toString(2)}, complété à ${intBits} bits : <mark>${G(r.intBin)}</mark>.`,
+                  r.steps.length
+                    ? `partie décimale : on multiplie par 2 et on garde le chiffre avant la virgule, ${r.steps.length} fois : ${fracList}${r.steps.length > 8 ? ' ; …' : ''}.`
+                    : 'pas de partie décimale : les bits après la virgule valent 0.',
+                  r.exact
+                    ? `la partie décimale est tombée à 0, la conversion est exacte. on complète à droite avec des 0 : <mark>${r.fracBin}</mark>.`
+                    : `on s’arrête quand les ${fracBits} bits sont remplis, la suite est tronquée : <mark>${r.fracBin}</mark>.`,
+                  `on assemble : <mark>${G(r.intBin)},${r.fracBin}</mark>.`,
+                ],
+              };
+            }
+
+            const r = NB.fixedDecode(valueOf('f-n'), intBits);
+            if (r.err) return r;
+            const tiles = [
+              ...r.intTerms.map(
+                (t) =>
+                  `<div class="wc"><b>1</b><span>${pw(2, t.pos)}</span><em>${nf(1n << BigInt(t.pos))}</em></div>`,
+              ),
+              ...r.fracTerms.map(
+                (t) => `<div class="wc"><b>1</b><span>${pw(2, t.pos)}</span><em>${t.w}</em></div>`,
+              ),
+            ];
+            return {
+              answer: `${ans(r.ib + ',' + r.fb, 2)} = ${r.value}`,
+              viz: `<div><h3>bits et poids</h3>${bits(r.ib + r.fb, { hex: false, cls: (k) => (k < r.ib.length ? 'e' : 'mt') })}</div><div class="wcols">${tiles.join('')}</div>`,
+              steps: [
+                `partie entière ${r.ib} = ${r.intTerms.map((t) => nf(1n << BigInt(t.pos))).join(' + ') || '0'} = ${nf(r.iv)}.`,
+                `partie décimale ${r.fb || '0'} : les poids sont 0,5, 0,25, 0,125, 0,0625, etc. ; bits à 1 : ${r.fracTerms.map((t) => t.w).join(' + ') || '0'} = 0,${r.value.split(',')[1]}.`,
+                `total : <mark>${r.value}</mark>.`,
+              ],
+            };
+          },
+          [
+            ['9,8125 sur 4 + 4 bits', { 'f-m': 'e', 'f-n': '9,8125', 'f-i': '4', 'f-f': '4' }],
+            ['45,375 sur 8 + 8 bits', { 'f-m': 'e', 'f-n': '45,375', 'f-i': '8', 'f-f': '8' }],
+            ['0,67 sur 16 + 16 bits', { 'f-m': 'e', 'f-n': '0,67', 'f-i': '16', 'f-f': '16' }],
+            ['décoder 01101010 sur 4 + 4', { 'f-m': 'd', 'f-n': '01101010', 'f-i': '4' }],
+          ],
+          { 'f-m': { e: { 'f-n': '9,8125', 'f-i': '4', 'f-f': '4' }, d: { 'f-n': '01101010', 'f-i': '4' } } },
+        );
+
+        tab(
+          'ieee',
+          'norme ieee 754',
+          () =>
+            `<div class="fields">${field(
+              'mode',
+              seg(
+                'i-m',
+                [
+                  ['e', 'coder un réel'],
+                  ['d', 'décoder'],
+                ],
+                'e',
+              ),
+              { wide: true },
+            )}${field('valeur', input('i-n', '12,375'), { wide: true, forId: 'i-n' })}${field(
+              'format',
+              seg(
+                'i-f',
+                [
+                  ['float', 'float, 32 bits'],
+                  ['double', 'double, 64 bits'],
+                ],
+                'float',
+              ),
+              { wide: true },
+            )}${field(
+              'saisie en',
+              seg(
+                'i-s',
+                [
+                  ['hex', 'hexadécimal'],
+                  ['bin', 'binaire'],
+                ],
+                'hex',
+              ),
+              { wide: true },
+            )}</div>`,
+          () => {
+            const mode = valueOf('i-m');
+            showField('i-f', mode === 'e');
+            showField('i-s', mode === 'd');
+            const legend = (F) =>
+              `<div class="legend"><span style="--c:var(--sign)">signe, 1 bit</span><span style="--c:var(--exp)">exposant, ${F.E} bits</span><span style="--c:var(--mant)">mantisse, ${F.M} bits</span></div>`;
+            const fieldCls = (F) => (k) => (k === 0 ? 's' : k <= F.E ? 'e' : 'mt');
+            const hexNote = (F) =>
+              `<p class="note">les paquets de 4 bits servent uniquement à passer entre binaire et hexadécimal. ils sont pris sur les ${F.total} bits à la suite, en partant de la droite, sans tenir compte des champs : le premier paquet contient donc le bit de signe et les 3 premiers bits de l'exposant.</p>`;
+
+            if (mode === 'e') {
+              const r = NB.ieeeEncode(valueOf('i-n'), valueOf('i-f'));
+              if (r.err) return r;
+              const F = r.F;
+              const shown = (r.p.neg ? '−' : '') + r.p.int + (r.p.frac ? ',' + r.p.frac : '');
+
+              if (r.special) {
+                const message = {
+                  zero: 'zéro est un cas particulier : exposant et mantisse valent 0.',
+                  denormal:
+                    'ce nombre est trop petit pour la forme normalisée : il est codé en dénormalisé, ce qui sort du programme. le codage machine est affiché.',
+                  inf: `ce nombre est trop grand pour un ${F.name} : il devient l'infini.`,
+                }[r.special];
+                return {
+                  answer: `${shown} s’écrit ${ans(r.hex, 16)}`,
+                  note: message,
+                  viz: ieeeFields(F, r.bits[0], r.bits.slice(1, 1 + F.E), r.bits.slice(1 + F.E), [
+                    '',
+                    '',
+                    '',
+                  ]),
+                  steps: [message],
+                };
+              }
+
+              const shift =
+                r.e0 > 0
+                  ? `de ${r.e0} rang${r.e0 > 1 ? 's' : ''} vers la gauche`
+                  : r.e0 < 0
+                    ? `de ${-r.e0} rang${r.e0 < -1 ? 's' : ''} vers la droite`
+                    : 'sans déplacement';
+              const fixed = r.fixedRepr;
+              const leadAt = fixed.indexOf('1');
+              const fixedHtml =
+                esc(fixed.slice(0, leadAt)) + '<span class="one">1</span>' + esc(fixed.slice(leadAt + 1));
+              const mantShown = r.normalized.slice(2);
+              const rounding = !r.roundBit
+                ? `le ${F.M + 1}e bit, celui qui suit la mantisse, vaut 0 : on tronque sans arrondir.`
+                : r.up
+                  ? `le ${F.M + 1}e bit vaut 1 : on arrondit en ajoutant 1 au dernier bit de la mantisse${r.carryOut ? ', et la retenue augmente l’exposant de 1' : ''}.`
+                  : `le ${F.M + 1}e bit vaut 1 mais n'est suivi que de 0 : c'est une égalité parfaite, la norme arrondit vers le bit pair, donc on ne change rien.`;
+              const intPart =
+                r.ip > 0n ? `${r.p.int} = ${binSum(NB.weights(r.intBin, 2))}, soit ${r.intBin}` : '0';
+              const signWord = r.sign ? 'négatif' : 'positif';
+
+              return {
+                answer: `${shown} s’écrit ${ans(r.hex, 16)}`,
+                note: r.check
+                  ? `<span class="ok">✓ identique au codage de la machine.</span> valeur réellement stockée : ${String(r.storedValue).replace('.', ',')}.`
+                  : `attention, la machine donne ${r.machineHex}.`,
+                viz: `
+            <div><h3>1. écriture en binaire</h3>${r.ip > 0n ? potence(r.div.rows, 2) + readout(r.div.rows) : ''}${r.steps.length ? fracTable(r.steps, 30) : ''}</div>
+            <div><h3>2. normalisation</h3><div class="norm">${fixedHtml} = <span class="one">1</span>,<span class="mt">${esc(mantShown)}</span> × 2<sup>${r.e0}</sup><span class="hint">virgule déplacée ${shift}</span></div></div>
+            <div><h3>3. exposant : ${r.e} + ${F.bias} = ${r.expStored}</h3>${potence(r.expDiv.rows, 2)}${readout(r.expDiv.rows)}</div>
+            <div><h3>4. mantisse et arrondi</h3><div class="cells">${[...r.mantRaw].map((c) => `<span class="bit mt">${c}</span>`).join('')}<span class="bit a">${r.roundBit}</span></div><p class="note">la case orange est le ${F.M + 1}e bit : il n'est pas stocké, il sert seulement à décider de l'arrondi.</p></div>
+            <div><h3>5. les trois champs</h3>${ieeeFields(F, String(r.sign), r.expBin, r.mant, [signWord, `${r.expStored} = ${r.e} + ${F.bias}`, `1,${mantShown}`])}</div>
+            ${binToHexSection(r.bits, { cls: fieldCls(F), title: '6. écriture hexadécimale', extra: legend(F) + hexNote(F) }).viz}`,
+                steps: [
+                  `signe : le nombre est ${signWord}, le bit de signe vaut <mark>${r.sign}</mark>. on continue avec la valeur absolue.`,
+                  `partie entière : ${intPart}.`,
+                  r.steps.length
+                    ? `partie décimale : multiplications successives par 2, ${r.steps.length} ligne${r.steps.length > 1 ? 's' : ''}${r.exactFrac ? ', jusqu’à tomber sur 0' : '. elle ne tombe jamais sur 0 : on s’arrête quand on a assez de bits'}. on obtient 0,${r.fracBin}${r.exactFrac ? '' : '…'}.`
+                    : 'pas de partie décimale.',
+                  `en binaire : ${esc(r.fixedRepr)}.`,
+                  `normalisation : on déplace la virgule ${shift} pour ne garder qu'un 1 devant : 1,${esc(mantShown)} × 2<sup>${r.e0}</sup>, donc e = ${r.e0}.`,
+                  `exposant stocké : e + ${F.bias} = ${r.e} + ${F.bias} = ${r.expStored}, soit <mark>${r.expBin}</mark> sur ${F.E} bits.`,
+                  `mantisse : on garde les ${F.M} bits après la virgule. le 1 de devant n'est pas stocké.`,
+                  rounding,
+                  `mantisse finale : ${r.mant}.`,
+                  `on met bout à bout signe, exposant et mantisse : ${r.sign} ${r.expBin} ${r.mant}.`,
+                  `pour l'hexadécimal, on reprend les ${F.total} bits à la suite, sans tenir compte des champs.`,
+                  ...binToHexSection(r.bits).steps,
+                ],
+              };
+            }
+
+            const source = valueOf('i-s');
+            const r = NB.ieeeDecode(valueOf('i-n'), source);
+            if (r.err) return r;
+            const F = r.F;
+            const steps = [];
+            const hx =
+              source === 'hex'
+                ? hexToBinSection(valueOf('i-n'), { cls: fieldCls(F), extra: legend(F) + hexNote(F) })
+                : null;
+            if (hx) steps.push(...hx.steps);
+            steps.push(
+              `on découpe les ${F.total} bits en trois champs : signe ${r.sign}, exposant ${r.expBin}, mantisse ${r.mantBin}.`,
+            );
+            let answer;
+            let valueViz = '';
+            if (r.kind === 'normal') {
+              steps.push(
+                `signe : ${r.sign}, le nombre est ${r.sign ? 'négatif' : 'positif'}.`,
+                `exposant : ${binSum(r.expW)} = ${r.expStored}, donc e = ${r.expStored} − ${F.bias} = <mark>${r.e}</mark>.`,
+                `on remet le 1 caché devant la mantisse : ${r.sign ? '−' : ''}${r.normalized} × 2<sup>${r.e}</sup>.`,
+              );
+              if (r.fixedInt !== undefined) {
+                steps.push(
+                  `on déplace la virgule de ${Math.abs(r.e)} rang${Math.abs(r.e) > 1 ? 's' : ''} vers la ${r.e >= 0 ? 'droite' : 'gauche'} : ${r.sign ? '−' : ''}${r.fixedInt}${r.fixedFrac ? ',' + r.fixedFrac : ''}.`,
+                  `en décimal : <mark>${r.exact}</mark>.`,
+                );
+              }
+              answer = `${source === 'hex' ? ans(r.hex, 16) : ans(`${r.sign} ${r.expBin} ${r.mantBin}`, 2)} = ${r.exact ?? String(r.value).replace('.', ',')}`;
+              valueViz = `<div><h3>valeur</h3><div class="norm">${r.sign ? '−' : ''}<span class="one">1</span>,<span class="mt">${esc(r.m || '0')}</span> × 2<sup>${r.e}</sup>${r.fixedInt !== undefined ? ` = ${r.sign ? '−' : ''}${r.fixedInt}${r.fixedFrac ? ',' + r.fixedFrac : ''}<sub>2</sub> = ${r.exact}` : ''}</div></div>`;
+            } else {
+              const message = {
+                zero: 'exposant et mantisse à 0 : c’est zéro.',
+                denormal: 'exposant à 0 et mantisse non nulle : nombre dénormalisé, hors programme.',
+                inf: 'exposant rempli de 1 et mantisse nulle : c’est l’infini.',
+                nan: 'exposant rempli de 1 et mantisse non nulle : NaN, pas un nombre.',
+              }[r.kind];
+              steps.push(message);
+              answer = `${source === 'hex' ? ans(r.hex, 16) : ans(`${r.sign} ${r.expBin} ${r.mantBin}`, 2)} = ${String(r.value).replace('.', ',')}`;
+            }
+            const captions =
+              r.kind === 'normal'
+                ? [r.sign ? 'négatif' : 'positif', `${r.expStored} − ${F.bias} = ${r.e}`, `1,${r.m || '0'}`]
+                : ['', `${r.expStored}`, ''];
+            const fromHex = hx ? hx.viz : '';
+            return {
+              answer,
+              note: `format détecté : ${F.name}.`,
+              viz: `${fromHex}<div><h3>les trois champs</h3>${ieeeFields(F, String(r.sign), r.expBin, r.mantBin, captions)}</div>${valueViz}`,
+              steps,
+            };
+          },
+          [
+            ['6,5', { 'i-m': 'e', 'i-n': '6,5', 'i-f': 'float' }],
+            ['−0,75', { 'i-m': 'e', 'i-n': '-0,75', 'i-f': 'float' }],
+            ['12,375', { 'i-m': 'e', 'i-n': '12,375', 'i-f': 'float' }],
+            ['−9,2', { 'i-m': 'e', 'i-n': '-9,2', 'i-f': 'float' }],
+            ['0,1 en double', { 'i-m': 'e', 'i-n': '0,1', 'i-f': 'double' }],
+            ['décoder 41480000', { 'i-m': 'd', 'i-s': 'hex', 'i-n': '41480000' }],
+            ['décoder C1133333', { 'i-m': 'd', 'i-s': 'hex', 'i-n': 'C1133333' }],
+            [
+              'décoder 0 10000010 10010000000000000000000',
+              { 'i-m': 'd', 'i-s': 'bin', 'i-n': '0 10000010 10010000000000000000000' },
+            ],
+          ],
+          {
+            'i-m': { e: { 'i-n': '12,375', 'i-f': 'float' }, d: { 'i-n': '41480000', 'i-s': 'hex' } },
+            'i-s': { hex: { 'i-n': '41480000' }, bin: { 'i-n': '0 10000010 10010000000000000000000' } },
+          },
+        );
+
+        const unitSelect = (id, selected) =>
+          `<select id="${id}">${NB.UNITS.map((u) => `<option${u.k === selected ? ' selected' : ''}>${u.k}</option>`).join('')}</select>`;
+        const fr = (x) => x.toLocaleString('fr-FR', { maximumFractionDigits: 6 });
+        const powLabel = (l) => l.replace(/\^(\d+)/, '<sup>$1</sup>');
+
+        tab(
+          'unites',
+          'unités et plages',
+          () =>
+            `<div class="fields">${field('quantité', input('u-v', '2', true), { forId: 'u-v' })}${field('unité de départ', unitSelect('u-a', 'To'), { forId: 'u-a' })}${field("unité d'arrivée", unitSelect('u-b', 'Tio'), { forId: 'u-b' })}${field('plage sur n bits', input('u-n', '16', true), { forId: 'u-n' })}</div>`,
+          () => {
+            const r = NB.units(valueOf('u-v'), valueOf('u-a'), valueOf('u-b'));
+            if (r.err) return r;
+            const n = Math.max(1, Math.min(64, +valueOf('u-n') || 8));
+            const g = NB.ranges(n);
+            const dec = NB.UNITS.slice(2, 6),
+              bin = NB.UNITS.slice(6);
+            const line = (u, v) =>
+              `<tr${u.k === r.U2.k || v.k === r.U2.k ? ' class="hl"' : ''}><td>${fr(r.bytes / u.f)} ${u.k}</td><td>${fr(r.bytes / v.f)} ${v.k}</td></tr>`;
+            return {
+              answer: `${fr(r.v)} ${r.U1.k} = ${fr(r.res)} ${r.U2.k}`,
+              viz: `<div><h3>la même quantité dans chaque unité</h3><div class="scroll"><table class="t"><thead><tr><th>préfixes décimaux, 10<sup>n</sup></th><th>préfixes binaires, 2<sup>n</sup></th></tr></thead><tbody>${dec.map((u, i) => line(u, bin[i])).join('')}</tbody></table></div></div>
+          <div><h3>plages sur ${n} bits</h3><div class="scroll"><table class="t"><thead><tr><th>type</th><th>minimum</th><th>maximum</th></tr></thead><tbody><tr><td class="l">non signé</td><td>0</td><td>${nf(g.umax)}</td></tr><tr><td class="l">signé, complément à deux</td><td>${nf(g.smin)}</td><td>${nf(g.smax)}</td></tr></tbody></table></div></div>`,
+              steps: [
+                `on convertit d'abord en octets : ${fr(r.v)} ${r.U1.k} × ${powLabel(r.U1.label)} = ${fr(r.bytes)} o.`,
+                `on divise par la taille de l'unité d'arrivée : ${fr(r.bytes)} ÷ ${powLabel(r.U2.label)} = <mark>${fr(r.res)} ${r.U2.k}</mark>.`,
+                'rappel : ko, Mo, Go et To sont des puissances de 10. Kio, Mio, Gio et Tio sont des puissances de 2, avec 1 Kio = 1 024 o.',
+                `sur ${n} bits : non signé de 0 à ${pw(2, n)} − 1 = ${nf(g.umax)}, signé de −${pw(2, n - 1)} = ${nf(g.smin)} à ${pw(2, n - 1)} − 1 = ${nf(g.smax)}.`,
+              ],
+            };
+          },
+          [
+            ['2 To en Tio', { 'u-v': '2', 'u-a': 'To', 'u-b': 'Tio' }],
+            ['256 Gio en Go', { 'u-v': '256', 'u-a': 'Gio', 'u-b': 'Go' }],
+            ['500 Go en Gio', { 'u-v': '500', 'u-a': 'Go', 'u-b': 'Gio' }],
+            ['plage sur 16 bits', { 'u-n': '16' }],
+          ],
+        );
+
+        const fieldsBits = (bits, F) => `${bits[0]} ${bits.slice(1, 1 + F.E)} ${bits.slice(1 + F.E)}`;
+        const CARRY = {
+          poids: {
+            'w-b': (to, from) => {
+              const r = NB.weights(valueOf('w-n'), +from);
+              return r.err ? null : { 'w-n': r.total.toString(+to).toUpperCase() };
+            },
+          },
+          binhex: {
+            'bh-m': (to) => {
+              const r = to === 'h' ? NB.binToHex(valueOf('bh-n')) : NB.hexToBin(valueOf('bh-n'));
+              return r.err ? null : { 'bh-n': r.result };
+            },
+          },
+          complement: {
+            'c-m': (to) => {
+              if (to === 'd') {
+                const r = NB.tcEncode(valueOf('c-n'), +valueOf('c-b'));
+                if (r.err) return null;
+                return valueOf('c-f') === 'hex' && r.hex
+                  ? { 'c-n': r.hex }
+                  : { 'c-n': r.result, 'c-f': 'bin' };
+              }
+              const r = NB.tcDecode(valueOf('c-n'), valueOf('c-f'));
+              if (r.err || ![4, 8, 16, 32].includes(r.n)) return null;
+              return { 'c-n': String(r.value), 'c-b': String(r.n) };
+            },
+            'c-f': (to) => {
+              if (to === 'hex') {
+                const r = NB.tcDecode(valueOf('c-n'), 'bin');
+                return r.err || !r.hex ? null : { 'c-n': r.hex };
+              }
+              const r = NB.hexToBin(valueOf('c-n'));
+              return r.err ? null : { 'c-n': r.full };
+            },
+          },
+          fixe: {
+            'f-m': (to) => {
+              if (to === 'd') {
+                const r = NB.fixedEncode(valueOf('f-n'), +valueOf('f-i') || 1, +valueOf('f-f') || 0);
+                return r.err ? null : { 'f-n': `${r.intBin},${r.fracBin}` };
+              }
+              const r = NB.fixedDecode(valueOf('f-n'), +valueOf('f-i') || 1);
+              return r.err
+                ? null
+                : { 'f-n': r.value, 'f-i': String(r.ib.length), 'f-f': String(r.fb.length) };
+            },
+          },
+          ieee: {
+            'i-m': (to) => {
+              if (to === 'd') {
+                const r = NB.ieeeEncode(valueOf('i-n'), valueOf('i-f'));
+                if (r.err) return null;
+                return valueOf('i-s') === 'bin' ? { 'i-n': fieldsBits(r.bits, r.F) } : { 'i-n': r.hex };
+              }
+              const r = NB.ieeeDecode(valueOf('i-n'), valueOf('i-s'));
+              if (r.err || r.kind === 'inf' || r.kind === 'nan') return null;
+              return {
+                'i-n': r.exact ?? String(r.value).replace('.', ','),
+                'i-f': r.F.total === 32 ? 'float' : 'double',
+              };
+            },
+            'i-s': (to) => {
+              const r = NB.ieeeDecode(valueOf('i-n'), to === 'bin' ? 'hex' : 'bin');
+              if (r.err) return null;
+              return to === 'bin' ? { 'i-n': fieldsBits(r.bits, r.F) } : { 'i-n': r.hex };
+            },
+          },
+        };
+
+        const HOME = {
+          id: 'accueil',
+          name: 'accueil',
+          descriptions: {
+            decimal: 'divisions successives vers la base 2, 8 ou 16',
+            poids: 'somme des chiffres multipliés par leur poids',
+            binhex: 'regroupement et développement par paquets de 4 bits',
+            operations: 'opérations posées en binaire, avec retenues et emprunts',
+            complement: 'coder et décoder des entiers négatifs sur n bits',
+            fixe: 'partie entière et partie décimale sur un nombre fixe de bits',
+            ieee: 'signe, exposant et mantisse, en float ou en double',
+            unites: 'ko, Kio, Go, Gio et plages de valeurs sur n bits',
+          },
+        };
+
+        function homePage() {
+          const items = TABS.map(
+            (t) =>
+              `<li><button type="button" data-go="${t.id}"><b>${t.name}</b><span>${HOME.descriptions[t.id]}</span></button></li>`,
+          );
+          return `<section class="home"><h1><span aria-hidden="true">✻</span>correcteur de numération</h1><p>choisissez un type d'exercice. chaque résultat est corrigé étape par étape, avec un schéma.</p><ul>${items.join('')}</ul></section>`;
+        }
+
+        const PAGES = [HOME, ...TABS];
+        const tabs = document.getElementById('tabs');
+        const panel = document.getElementById('panel');
+        const drawer = document.getElementById('drawer');
+        const drawerList = document.getElementById('drawer-list');
+        const scrim = document.getElementById('scrim');
+        const burger = document.getElementById('burger');
+        let current;
+        const selectValues = {};
+
+        tabs.innerHTML =
+          `<button type="button" class="home-link" data-id="accueil" aria-label="accueil">✻</button>` +
+          TABS.map((t) => `<button type="button" role="tab" data-id="${t.id}">${t.name}</button>`).join('');
+        drawerList.innerHTML = TABS.map(
+          (t) => `<li><button type="button" data-id="${t.id}">${t.name}</button></li>`,
+        ).join('');
+
+        function openDrawer() {
+          drawer.inert = false;
+          drawer.classList.add('open');
+          scrim.hidden = false;
+          burger.setAttribute('aria-expanded', 'true');
+          drawerList.querySelector('[aria-current="true"]')?.focus();
+        }
+
+        function closeDrawer(returnFocus = false) {
+          if (!drawer.classList.contains('open')) return;
+          drawer.classList.remove('open');
+          drawer.inert = true;
+          scrim.hidden = true;
+          burger.setAttribute('aria-expanded', 'false');
+          if (returnFocus) burger.focus();
+        }
+
+        function show(id) {
+          current = PAGES.find((t) => t.id === id) || HOME;
+          tabs
+            .querySelectorAll('button')
+            .forEach((b) => b.setAttribute('aria-selected', String(b.dataset.id === current.id)));
+          drawerList
+            .querySelectorAll('button')
+            .forEach((b) => b.setAttribute('aria-current', String(b.dataset.id === current.id)));
+          document.getElementById('crumb').textContent = current.name;
+          if (current === HOME) {
+            panel.innerHTML = homePage();
+            return;
+          }
+          const examples = current.examples
+            .map(([label], i) => `<button type="button" data-i="${i}">${esc(label)}</button>`)
+            .join('');
+          panel.innerHTML = `<div class="enonce">${current.form()}<div class="ex">exemples ${examples}</div></div><div class="out" id="out" aria-live="polite"></div>`;
+          panel.querySelectorAll('select').forEach((el) => (selectValues[el.id] = el.value));
+          update();
+        }
+
+        function update() {
+          let result;
+          try {
+            result = current.run();
+          } catch (error) {
+            console.error(error);
+            result = { err: 'calcul impossible avec cette valeur, vérifiez la saisie.' };
+          }
+          sizeInputs();
+          document.getElementById('out').innerHTML = render(result);
+        }
+
+        function setValue(id, value) {
+          const el = document.getElementById(id);
+          if (!el) return;
+          if (el.classList.contains('seg')) {
+            el.dataset.val = value;
+            el.querySelectorAll('button').forEach((b) =>
+              b.setAttribute('aria-pressed', String(b.dataset.v === value)),
+            );
+          } else {
+            el.value = value;
+            if (el.tagName === 'SELECT') selectValues[id] = el.value;
+          }
+        }
+
+        const memory = {};
+        const snapshot = () =>
+          Object.fromEntries(
+            [...panel.querySelectorAll('.enonce input, .enonce select, .enonce .seg')].map((el) => [
+              el.id,
+              valueOf(el.id),
+            ]),
+          );
+
+        function switchMode(id, from, to) {
+          const state = { ...snapshot(), [id]: from };
+          const back = memory[current.id + id];
+          if (
+            back &&
+            back.to === from &&
+            back.before[id] === to &&
+            JSON.stringify(state) === JSON.stringify(back.after)
+          ) {
+            Object.entries(back.before).forEach(([k, v]) => setValue(k, v));
+            delete memory[current.id + id];
+            return;
+          }
+          setValue(id, to);
+          const carried = CARRY[current.id]?.[id]?.(to, from);
+          if (carried) Object.entries(carried).forEach(([k, v]) => setValue(k, v));
+          if (current.run().err) {
+            const preset = current.presets?.[id]?.[to];
+            if (preset) Object.entries(preset).forEach(([k, v]) => setValue(k, v));
+          }
+          memory[current.id + id] = { to, before: state, after: snapshot() };
+        }
+
+        function select(id) {
+          show(id);
+          closeDrawer();
+          try {
+            history.replaceState(null, '', id === HOME.id ? location.pathname : '#' + id);
+          } catch (error) {}
+        }
+
+        function fit() {
+          document.body.classList.remove('compact');
+          const lines = new Set([...tabs.children].map((b) => b.offsetTop)).size;
+          const compact = lines > 1;
+          document.body.classList.toggle('compact', compact);
+          if (!compact) closeDrawer();
+        }
+
+        tabs.addEventListener('click', (e) => {
+          const b = e.target.closest('button');
+          if (b) select(b.dataset.id);
+        });
+        drawerList.addEventListener('click', (e) => {
+          const b = e.target.closest('button');
+          if (b) {
+            select(b.dataset.id);
+            burger.focus();
+          }
+        });
+        burger.addEventListener('click', openDrawer);
+        drawer.querySelector('.drawer-home').addEventListener('click', () => {
+          select('accueil');
+          burger.focus();
+        });
+        scrim.addEventListener('click', () => closeDrawer(true));
+        document.getElementById('drawer-close').addEventListener('click', () => closeDrawer(true));
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') closeDrawer(true);
+        });
+
+        panel.addEventListener('input', update);
+        panel.addEventListener('change', (e) => {
+          if (e.target.tagName === 'SELECT') {
+            switchMode(e.target.id, selectValues[e.target.id], e.target.value);
+            selectValues[e.target.id] = e.target.value;
+          }
+          update();
+        });
+        panel.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter' && e.target.tagName === 'INPUT') e.target.blur();
+        });
+        panel.addEventListener('click', (e) => {
+          const go = e.target.closest('[data-go]');
+          if (go) {
+            select(go.dataset.go);
+            scrollTo(0, 0);
+            return;
+          }
+          const segButton = e.target.closest('.seg button');
+          if (segButton) {
+            const id = segButton.parentElement.id;
+            const from = valueOf(id);
+            if (from !== segButton.dataset.v) switchMode(id, from, segButton.dataset.v);
+            update();
+            return;
+          }
+          const example = e.target.closest('.ex button');
+          if (example) {
+            Object.entries(current.examples[+example.dataset.i][1]).forEach(([k, v]) => setValue(k, v));
+            update();
+            if (innerWidth < 720) {
+              const smooth = !matchMedia('(prefers-reduced-motion: reduce)').matches;
+              document
+                .querySelector('.result')
+                ?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto', block: 'start' });
+            }
+          }
+        });
+
+        window.addEventListener('hashchange', () => {
+          if (location.hash.slice(1) !== current.id) show(location.hash.slice(1));
+        });
+        let lastWidth = 0;
+        new ResizeObserver(([entry]) => {
+          const width = Math.round(entry.contentRect.width);
+          if (width === lastWidth) return;
+          lastWidth = width;
+          requestAnimationFrame(fit);
+        }).observe(document.querySelector('.wrap'));
+        if (document.fonts) document.fonts.ready.then(fit);
+        show(location.hash.slice(1));
+        fit();
+      })();
+    </script>
+  </body>
+</html>
